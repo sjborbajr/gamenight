@@ -1,7 +1,7 @@
 # Game Night
 I have wanted to do a little more real programming and the problem I really had is not knowing what to do.
 
-During this whole pandemmic, I realized how mush I missed going to my mom's house for game night and though it would be really fun if I could host a game night now that we are dispursed geographically.  I don't want to solve the communications issue - the phone companies did a really good job and now Facebook, zoom, discord, you name it has really stepped up and made that issue go away.
+During this whole pandemmic, I realized how much I missed going to my mom's house for game night and though it would be really fun if I could host a game night now that we are dispursed geographically.  I don't want to solve the communications issue - the phone companies did a really good job and now Facebook, zoom, discord, you name it has really stepped up and made that issue go away.
 
 But they don't (currently) have a way for us to play those games.  So I am going to build it!
 Card Games:
