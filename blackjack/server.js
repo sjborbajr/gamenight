@@ -66,7 +66,7 @@ io.on('connection', (socket) => {
     }
 
     let playerHand = gameState.playerHand;
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner });
+    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner, cardCount: gameState.deck.length });
   });
 
   socket.on('stand', () => {
@@ -91,7 +91,7 @@ io.on('connection', (socket) => {
     } else {
       gameState.winner = 'player';
     }
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner }); 
+    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner, cardCount: gameState.deck.length }); 
   });
 
 });
@@ -126,7 +126,7 @@ function initialDeal(socket) {
 
     let playerHand = gameState.playerHand
     // Send hands to the client
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner });
+    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner, cardCount: gameState.deck.length });
 }
 
 // Initialize the deck of cards
