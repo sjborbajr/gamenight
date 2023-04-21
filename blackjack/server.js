@@ -45,7 +45,7 @@ const gameStatePublic = {
 };
 
 io.on('connection', (socket) => {
-  console.log('Player connected: $socket.id{}');
+  console.log('Player connected: '+socket.id);
 
   addPlayer(socket.id);
 
@@ -53,41 +53,40 @@ io.on('connection', (socket) => {
   if (Object.keys(gameStatePublic.players).length === 1) {
     console.log('Starting a new game...');
     gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
-    console.log('Shuffled Deck');
     dealHands();
     gameStatePublic.players[socket.id].playing = true;
     gameStatePublic.players[socket.id].turn = true;
   }
 
   // Send the initial game state to the player
-  socket.emit('gameStatePublic', gameStatePublic);
+  socket.emit('gameState', gameStatePublic);
 
   socket.on('hit', () => {
-    console.log('Player ${socket.id} hit');
-    let player = gameStatePublic.players[socketId];
-    let deck = gameStatePrivate.deck;
+    console.log('Player '+socket.id+' hit.');
         
     // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
-    if (player.turn = true) {
-      player.hand.push(deck.shift());
-      player.score = calculateScore(player.hand);
+    if (gameStatePublic.players[socket.id].turn == true) {
+      gameStatePublic.players[socket.id].hand.push(gameStatePrivate.deck.shift());
+      gameStatePublic.players[socket.id].score = calculateScore(gameStatePublic.players[socket.id].hand)
 
-      if (player.score > 21) {
-        player.turn = false;
+      if (gameStatePublic.players[socket.id].score > 21) {
+        console.log('Player '+socket.id+' busted');
+        gameStatePublic.players[socket.id].turn = false;
       }
-      socket.emit('gameStatePublic', gameStatePublic);
+      console.log('Deck Card Count: '+gameStatePrivate.deck.length);
+      socket.emit('gameState', gameStatePublic);
+    } else {
+      console.log('Not Players turn');
     }
   });
 
   socket.on('stand', () => {
     console.log('standing');
-    let player = gameStatePublic.players[socketId];
-    
-    player.turn = false;
+    gameStatePublic.players[socket.id].turn = false;
     
     //' more work needed
     gameStatePublic.dealerCards = gameStatePrivate.dealerCards
-    socket.emit('gameStatePublic', gameStatePublic);
+    socket.emit('gameState', gameStatePublic);
   });
 
 });
@@ -114,30 +113,27 @@ function removePlayer(socketId) {
   delete gameStatePlublic.players[socketId];
 }
 function dealHands() {
-  let dealerHand = gameStatePublic.dealerCards;
-  let dealerHandCopy = gameStatePrivate.dealerCards;
-  let deck = gameStatePrivate.deck.shift();
-
   //deal first card to everyone
-  for (let player in gameStatePublic.players) {
-    player.hand.push(deck.shift());
+  for (let playerID in gameStatePublic.players) {
+    gameStatePublic.players[playerID].hand = [gameStatePrivate.deck.shift()];
   }
-  dealerHand.push(deck.shift())
+  gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];
 
   //add place holder for dealers first card
-  dealerHandCopy.push({ rank: 'Unknown', value: 0, suit: 'Unknown', image: 'images/red_back.png' })
+  gameStatePublic.dealerCards = [{ rank: 'Unknown', value: 0, suit: 'Unknown', image: 'images/red_back.png' }];
 
   //deal second card to everyone
-  for (let player in gameStatePublic.players) {
-    player.hand.push(deck.shift());
-    player.score = calculateScore(player.hand);
-    player.winner = null;
+  for (let playerID in gameStatePublic.players) {
+    gameStatePublic.players[playerID].hand.push(gameStatePrivate.deck.shift());
+    gameStatePublic.players[playerID].score = calculateScore(gameStatePublic.players[playerID].hand);
+    gameStatePublic.players[playerID].winner = null;
   }
-  dealerHand.push(gameState.deck.shift());
-  gameStatePrivate.dealerScore = calculateScore(dealerHand);
+  gameStatePrivate.dealerCards.push(gameStatePrivate.deck.shift());
+  gameStatePrivate.dealerScore = calculateScore(gameStatePrivate.dealerCards);
   
   //everyone can see dealers second card
-  dealerHandCopy.push(dealerHand[1]);
+  gameStatePublic.dealerCards.push(gameStatePrivate.dealerCards[1]);
+  console.log('Dealt '+gameStatePublic.players.count+' and dealer a new hand');
 
 }
 
@@ -184,6 +180,7 @@ function shuffleDeck(deck) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
+  console.log('Shuffled Deck with '+deck.length+' cards.');
   return deck
 }
 function checkWinner (player) {

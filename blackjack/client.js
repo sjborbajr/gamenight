@@ -10,19 +10,13 @@ window.onload = function() {
   socket.emit('startGame');
 };
 
-socket.on('showHands', data => {
-  const dealerHand = data.dealerHand;
-  const playerHand = data.playerHand;
+socket.on('gameState', data => {
+  console.log('got game state');
+  const dealerHand = data.dealerCards;
+  const player = data.players[socket.id];
 
   drawDealerCards(dealerHand);
-  drawPlayerCards(playerHand); 
-  if (data.winner) {
-    setButtonsEnabled(false);
-    showWinner(data.winner);
-  } else {
-    setButtonsEnabled(true);
-  }
-  updateScores(calculateScore(playerHand), calculateScore(dealerHand));
+  drawPlayerCards(player.hand); 
 
 });
 
@@ -34,7 +28,7 @@ document.getElementById('deal').addEventListener('click', deal);
 
 // Listen for events from the server
 socket.on('connect', () => {
-  console.log('Connected to server');
+  console.log('Connected to server, session id: '+socket.id);
 });
 
 socket.on('disconnect', () => {
