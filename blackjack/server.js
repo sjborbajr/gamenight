@@ -7,6 +7,8 @@ const socketIO = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
+const path = require('path');
+let joincount = 0;
 
 // Start the server
 const port = 3000;
@@ -15,118 +17,128 @@ server.listen(port, () => {
 });
 
 // Send index file when there is a connection
-app.use(express.static(__dirname + '/public'));
+app.use(express.static(path.join(__dirname,'public')));
 app.get('/', function (req, res) {
-    res.sendFile('index.html');
+    res.sendFile(path.join(__dirname,'index.html'));
 });
 
 app.set('js', 'text/javascript');
 app.get('/client.js', function(req, res) {
 	  res.set('Content-Type', app.get('js'));
-	  res.sendFile(__dirname + '/client.js');
+	  res.sendFile(path.join(__dirname,'client.js'));
 });
 
 // Game state
 
 const numDecks = 2;
-const gameState = {
-  players: {},
-  playerHand: [],
+const gameStatePrivate = {
   deck: [],
   dealerCards: [],
+  dealerScore: 0,
+};
+const gameStatePublic = {
+  players: {},
+  deckSize: 0,
+  deckRemain: 0,
+  dealerCards: [],
   currentPlayer: null,
-  winner: null,
-  gameOver: false,
 };
 
 io.on('connection', (socket) => {
-  console.log('A user connected!');
-  socket.on('startGame', () => {
+  console.log('Player connected: $socket.id{}');
+
+  addPlayer(socket.id);
+
+  // Start the game if this is the first player
+  if (Object.keys(gameStatePublic.players).length === 1) {
     console.log('Starting a new game...');
-
-    gameState.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
+    gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
     console.log('Shuffled Deck');
-    initialDeal(socket)
-  });
+    dealHands();
+    gameStatePublic.players[socket.id].playing = true;
+    gameStatePublic.players[socket.id].turn = true;
+  }
 
-  socket.on('deal', () => {
-    initialDeal(socket)
-  });
+  // Send the initial game state to the player
+  socket.emit('gameStatePublic', gameStatePublic);
 
   socket.on('hit', () => {
-    console.log('hit');
-    gameState.playerHand.push(gameState.deck.shift());
+    console.log('Player ${socket.id} hit');
+    let player = gameStatePublic.players[socketId];
+    let deck = gameStatePrivate.deck;
+        
+    // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
+    if (player.turn = true) {
+      player.hand.push(deck.shift());
+      player.score = calculateScore(player.hand);
 
-    let playerscore = calculateScore(gameState.playerHand);
-    let dealerHand = [ { rank: 'Unknown', value: 0, suit: 'Unknown', image: 'images/red_back.png' } , gameState.dealerCards[1] ]
-
-    if (playerscore > 21) {
-      gameState.winner = 'dealer';
-      gameState.gameOver = true;
+      if (player.score > 21) {
+        player.turn = false;
+      }
+      socket.emit('gameStatePublic', gameStatePublic);
     }
-
-    let playerHand = gameState.playerHand;
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner, cardCount: gameState.deck.length });
   });
 
   socket.on('stand', () => {
     console.log('standing');
-    let dealerHand = gameState.dealerCards;
-    let playerHand = gameState.playerHand;
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner });
+    let player = gameStatePublic.players[socketId];
+    
+    player.turn = false;
+    
+    //' more work needed
+    gameStatePublic.dealerCards = gameStatePrivate.dealerCards
+    socket.emit('gameStatePublic', gameStatePublic);
+  });
 
-    let playerscore = calculateScore(playerHand);
+});
+function playDealer() {
     let dealerscore = calculateScore(dealerHand);
     while (dealerscore < 17) {
       dealerHand.push(gameState.deck.shift())
       socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner });
       dealerscore = calculateScore(dealerHand);
     }
-    if (dealerscore > 21) {
-      gameState.winner = 'player';
-    } else if (dealerscore == playerscore) {
-      gameState.winner = 'tie';
-    } else if (dealerscore > playerscore) {
-      gameState.winner = 'dealer';
-    } else {
-      gameState.winner = 'player';
-    }
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner, cardCount: gameState.deck.length }); 
-  });
+}
+function addPlayer(socketId) {
+  // winner being null = undecided
+  gameStatePublic.players[socketId] = {
+    hand: [],
+    score: 0,
+    join_order: joincount++,
+    playing: false,
+    turn: false,
+    winner: null,
+  };
+}
+function removePlayer(socketId) {
+  delete gameStatePlublic.players[socketId];
+}
+function dealHands() {
+  let dealerHand = gameStatePublic.dealerCards;
+  let dealerHandCopy = gameStatePrivate.dealerCards;
+  let deck = gameStatePrivate.deck.shift();
 
-});
+  //deal first card to everyone
+  for (let player in gameStatePublic.players) {
+    player.hand.push(deck.shift());
+  }
+  dealerHand.push(deck.shift())
 
-function initialDeal(socket) {
-    if (gameState.deck.length < 10) {
-      gameState.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
-      console.log('Shuffled Deck');
-    }
+  //add place holder for dealers first card
+  dealerHandCopy.push({ rank: 'Unknown', value: 0, suit: 'Unknown', image: 'images/red_back.png' })
 
-    gameState.playerHand = [];
-    gameState.dealerCards = [];
-    gameState.winner = null;
-    gameState.playerHand.push(gameState.deck.shift());
-    gameState.dealerCards.push(gameState.deck.shift());
-    gameState.playerHand.push(gameState.deck.shift());
-    gameState.dealerCards.push(gameState.deck.shift());
+  //deal second card to everyone
+  for (let player in gameStatePublic.players) {
+    player.hand.push(deck.shift());
+    player.score = calculateScore(player.hand);
+    player.winner = null;
+  }
+  dealerHand.push(gameState.deck.shift());
+  gameStatePrivate.dealerScore = calculateScore(dealerHand);
+  
+  //everyone can see dealers second card
+  dealerHandCopy.push(dealerHand[1]);
 
-    let dealerscore = calculateScore(gameState.dealerCards);
-    let playerscore = calculateScore(gameState.playerHand);
-
-    let dealerHand = gameState.dealerCards
-    if (playerscore == 21 && dealerscore == 21) {
-      gameState.winner = 'tie';
-    } else if (playerscore == 21) {
-      gameState.winner = 'player';
-    } else if (dealerscore == 21) {
-      gameState.winner = 'dealer';
-    } else {
-      dealerHand = [ { rank: 'Unknown', value: 0, suit: 'Unknown', image: 'images/red_back.png' } , gameState.dealerCards[1] ]
-    }
-
-    let playerHand = gameState.playerHand
-    // Send hands to the client
-    socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner, cardCount: gameState.deck.length });
 }
 
 // Initialize the deck of cards
@@ -164,7 +176,6 @@ function initDeck(numDecks) {
   }
   return deck;
 }
-
 // Shuffle the deck of cards
   // Move from the last position to the first and select a random card
   // from the remaining cards to put in that position.
@@ -175,7 +186,20 @@ function shuffleDeck(deck) {
   }
   return deck
 }
+function checkWinner (player) {
+  let dealerHand = gameStatePublic.dealerCards;
 
+    
+  if (dealerscore > 21) {
+    gameState.winner = 'player';
+  } else if (dealerscore == playerscore) {
+    gameState.winner = 'push';
+  } else if (dealerscore > playerscore) {
+    gameState.winner = 'dealer';
+  } else {
+    gameState.winner = 'player';
+  }
+}
 // Calculate the score of a hand
 function calculateScore(cards) {
   let score = cards.reduce((sum, card) => sum + card.value, 0);

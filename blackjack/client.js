@@ -1,9 +1,9 @@
 const socket = io(); // Connect to the server using Socket.IO
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const win = 0;
-const loose = 0;
-const play = 0;
+let win = 0;
+let loose = 0;
+let play = 0;
 
 // Draw the game board and cards
 window.onload = function() {
@@ -16,14 +16,13 @@ socket.on('showHands', data => {
 
   drawDealerCards(dealerHand);
   drawPlayerCards(playerHand); 
-  updateScores(calculateScore(playerHand), calculateScore(dealerHand));
-
   if (data.winner) {
     setButtonsEnabled(false);
     showWinner(data.winner);
   } else {
     setButtonsEnabled(true);
   }
+  updateScores(calculateScore(playerHand), calculateScore(dealerHand));
 
 });
 
@@ -51,12 +50,12 @@ function setButtonsEnabled(enabled) {
 function showWinner(winner) {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = `Winner: "${winner}"`;
-  if ( winner == "dealer" ) {
-    loose = loose + 1
-  } else if ( winner == "player" ) {
-    win = win + 1
+  if ( winner === "dealer" ) {
+    loose++
+  } else if ( winner === "player" ) {
+    win++
   }
-  play = play + 1
+  play++
 }
 function updateScores(playerScore, dealerScore) {
   const scoreElement = document.getElementById('scores');
@@ -80,7 +79,9 @@ function newGame() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  socket.emit('startGame');
+  setTimeout(()=> {
+    socket.emit('startGame');
+  },500);
 }
 
 // create a function to draw the dealer's cards
