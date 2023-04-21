@@ -17,6 +17,8 @@ socket.on('gameState', data => {
 
   drawDealerCards(dealerHand);
   drawPlayerCards(player.hand); 
+  
+  setButtons(player.playing)
 
 });
 
@@ -36,10 +38,11 @@ socket.on('disconnect', () => {
 });
 
 // update page functions
-function setButtonsEnabled(enabled) {
+function setButtons(enabled) {
   document.getElementById('stand').disabled = !enabled;
   document.getElementById('hit').disabled = !enabled;
   document.getElementById('deal').disabled = enabled;
+  document.getElementById('new_game').disabled = enabled;
 }
 function showWinner(winner) {
   const winnerElement = document.getElementById('winner');
