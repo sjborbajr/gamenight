@@ -1,19 +1,25 @@
-const socket = io(); // Connect to the server using Socket.IO
+const socket = io({autoConnect: false}); // Connect to the server using Socket.IO
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let win = 0;
 let loose = 0;
 let play = 0;
+let userId = null;
+let playerName = localStorage.getItem('playerName'); // get playerName from local storage
+const nameForm = document.getElementById('name-form');
 
 // Draw the game board and cards
 window.onload = function() {
   socket.emit('startGame');
 };
-
+socket.on('youare', data => {
+  userId = data;
+  console.log('user id: '+userId);
+})
 socket.on('gameState', data => {
   console.log('got game state');
   const dealerHand = data.dealerCards;
-  const player = data.players[socket.id];
+  const player = data.players[userId];
 
   drawDealerCards(dealerHand);
   drawPlayerCards(player.hand); 
@@ -21,16 +27,37 @@ socket.on('gameState', data => {
   setButtons(player.playing)
 
 });
-
+socket.onAny((event, ...args) => {
+  console.log(event, args);
+});
 // Attach event listeners to the buttons
 document.getElementById('hit').addEventListener('click', hit);
 document.getElementById('stand').addEventListener('click', stand);
 document.getElementById('new_game').addEventListener('click', newGame);
 document.getElementById('deal').addEventListener('click', deal);
+const storedPlayerName = localStorage.getItem('playerName');
+if (storedPlayerName) {
+  playerName = storedPlayerName;
+  nameForm.style.display = 'none';
+  socket.auth = { playerName };
+  socket.connect();
+}
+nameForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  playerName = document.getElementById('player-name').value;
+  socket.auth = { playerName };
+  socket.connect();
+  if (playerName) {
+    nameForm.style.display = 'none';
+    localStorage.setItem('playerName', playerName);
+  }
+});
 
 // Listen for events from the server
 socket.on('connect', () => {
-  console.log('Connected to server, session id: '+socket.id);
+  console.log('Connected to server');
+  socket.emit('setPlayerName', playerName);
+
 });
 
 socket.on('disconnect', () => {
@@ -61,24 +88,25 @@ function updateScores(playerScore, dealerScore) {
 
 // Send messages to the server
 function hit() {
+  console.log('Send hit');
   socket.emit('hit');
 }
 function deal() {
+  console.log('Send deal');
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   socket.emit('deal');
 }
 function stand() {
+  console.log('Send stand');
   socket.emit('stand');
 }
 function newGame() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  setTimeout(()=> {
     socket.emit('startGame');
-  },500);
 }
 
 // create a function to draw the dealer's cards

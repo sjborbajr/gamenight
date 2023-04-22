@@ -2,6 +2,7 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
+const cookieParser = require('cookie-parser');
 
 // Set up the server
 const app = express();
@@ -9,6 +10,7 @@ const server = http.createServer(app);
 const io = socketIO(server);
 const path = require('path');
 let joincount = 0;
+let userId = null;
 
 // Start the server
 const port = 3000;
@@ -19,7 +21,7 @@ server.listen(port, () => {
 // Send index file when there is a connection
 app.use(express.static(path.join(__dirname,'public')));
 app.get('/', function (req, res) {
-    res.sendFile(path.join(__dirname,'index.html'));
+  res.sendFile(path.join(__dirname,'index.html'));
 });
 
 app.set('js', 'text/javascript');
@@ -45,33 +47,47 @@ const gameStatePublic = {
 };
 
 io.on('connection', (socket) => {
-  console.log('Player connected: '+socket.id);
+  // Get the user id from the cookie
+  console.log('socket key: '+Object.keys(socket));
+  console.log('client: '+Object.keys(socket.client));
+  console.log('data: '+Object.keys(socket.data));
+  console.log('playername: '+socket.handshake.auth.playerName);
+  if (userId == null) {
+    userId = socket.id;
+  }
 
-  addPlayer(socket.id);
+  console.log('Player connected: '+userId);
+  socket.emit('youare', userId);
+  addPlayer(userId);
 
   // Start the game if this is the first player
   if (Object.keys(gameStatePublic.players).length === 1) {
     console.log('Starting a new game...');
     gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
     dealHands();
-    gameStatePublic.players[socket.id].playing = true;
-    gameStatePublic.players[socket.id].turn = true;
+    gameStatePublic.players[userId].playing = true;
+    gameStatePublic.players[userId].turn = true;
   }
 
   // Send the initial game state to the player
   socket.emit('gameState', gameStatePublic);
-
+  socket.on('setPlayerName', data => {
+    console.log('got player name: '+data);
+  });
+  socket.onAny((event, ...args) => {
+    console.log(event, args);
+  });
   socket.on('hit', () => {
-    console.log('Player '+socket.id+' hit.');
+    console.log('Player '+userId+' hit.');
         
     // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
-    if (gameStatePublic.players[socket.id].turn == true) {
-      gameStatePublic.players[socket.id].hand.push(gameStatePrivate.deck.shift());
-      gameStatePublic.players[socket.id].score = calculateScore(gameStatePublic.players[socket.id].hand)
+    if (gameStatePublic.players[userId].turn == true) {
+      gameStatePublic.players[userId].hand.push(gameStatePrivate.deck.shift());
+      gameStatePublic.players[userId].score = calculateScore(gameStatePublic.players[userId].hand)
 
-      if (gameStatePublic.players[socket.id].score > 21) {
-        console.log('Player '+socket.id+' busted');
-        gameStatePublic.players[socket.id].turn = false;
+      if (gameStatePublic.players[userId].score > 21) {
+        console.log('Player '+userId+' busted');
+        gameStatePublic.players[userId].turn = false;
       }
       console.log('Deck Card Count: '+gameStatePrivate.deck.length);
       socket.emit('gameState', gameStatePublic);
@@ -82,7 +98,7 @@ io.on('connection', (socket) => {
 
   socket.on('stand', () => {
     console.log('standing');
-    gameStatePublic.players[socket.id].turn = false;
+    gameStatePublic.players[userId].turn = false;
     
     //' more work needed
     gameStatePublic.dealerCards = gameStatePrivate.dealerCards
@@ -113,9 +129,11 @@ function removePlayer(socketId) {
   delete gameStatePlublic.players[socketId];
 }
 function dealHands() {
+  let count = 0;
   //deal first card to everyone
   for (let playerID in gameStatePublic.players) {
     gameStatePublic.players[playerID].hand = [gameStatePrivate.deck.shift()];
+    count++
   }
   gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];
 
@@ -133,7 +151,7 @@ function dealHands() {
   
   //everyone can see dealers second card
   gameStatePublic.dealerCards.push(gameStatePrivate.dealerCards[1]);
-  console.log('Dealt '+gameStatePublic.players.count+' and dealer a new hand');
+  console.log('Dealt '+count+' player and dealer a new hand');
 
 }
 
