@@ -12,14 +12,10 @@ const nameForm = document.getElementById('name-form');
 window.onload = function() {
   socket.emit('startGame');
 };
-socket.on('youare', data => {
-  userId = data;
-  console.log('user id: '+userId);
-})
 socket.on('gameState', data => {
   console.log('got game state');
   const dealerHand = data.dealerCards;
-  const player = data.players[userId];
+  const player = data.players[playerName];
 
   drawDealerCards(dealerHand);
   drawPlayerCards(player.hand); 
@@ -56,7 +52,6 @@ nameForm.addEventListener('submit', (e) => {
 // Listen for events from the server
 socket.on('connect', () => {
   console.log('Connected to server');
-  socket.emit('setPlayerName', playerName);
 
 });
 

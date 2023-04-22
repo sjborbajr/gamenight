@@ -53,11 +53,10 @@ io.on('connection', (socket) => {
   console.log('data: '+Object.keys(socket.data));
   console.log('playername: '+socket.handshake.auth.playerName);
   if (userId == null) {
-    userId = socket.id;
+    userId = socket.handshake.auth.playerName;
   }
 
   console.log('Player connected: '+userId);
-  socket.emit('youare', userId);
   addPlayer(userId);
 
   // Start the game if this is the first player
@@ -71,9 +70,6 @@ io.on('connection', (socket) => {
 
   // Send the initial game state to the player
   socket.emit('gameState', gameStatePublic);
-  socket.on('setPlayerName', data => {
-    console.log('got player name: '+data);
-  });
   socket.onAny((event, ...args) => {
     console.log(event, args);
   });
