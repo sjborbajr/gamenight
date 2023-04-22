@@ -10,7 +10,8 @@ const server = http.createServer(app);
 const io = socketIO(server);
 const path = require('path');
 let joincount = 0;
-let userId = null;
+const disconnectedPlayers = {};
+let cardcount = 0;
 
 // Start the server
 const port = 3000;
@@ -48,44 +49,51 @@ const gameStatePublic = {
 };
 
 io.on('connection', (socket) => {
-  // Get the user id from the cookie
-  console.log('playername: '+socket.handshake.auth.playerName);
-  if (userId == null) {
-    userId = socket.handshake.auth.playerName;
+  // Get the user id from handshake
+  const userId = socket.handshake.auth.playerName;
+  console.log('User connected: '+userId);
+  if ( !(gameStatePublic.players[userId])) {
+    addPlayer(userId);
+    
+    // Start the game if this is the first player
+    if (Object.keys(gameStatePublic.players).length === 1) {
+      console.log('Starting a new game...');
+      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
+      gameStatePublic.deckSize = (numDecks * 52);
+      dealHands();
+      gameStatePublic.players[userId].playing = true;
+      gameStatePublic.players[userId].turn = true;
+    }
   }
 
-  console.log('Player connected: '+userId);
-  addPlayer(userId);
-
-  // Start the game if this is the first player
-  if (Object.keys(gameStatePublic.players).length === 1) {
-    console.log('Starting a new game...');
-    gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
-    gameStatePublic.deckSize = (numDecks * 52);
-    dealHands();
-    gameStatePublic.players[userId].playing = true;
-    gameStatePublic.players[userId].turn = true;
-  }
-
-  // Send the initial game state to the player
+  // Send current game state to the player
+  socket.emit('Running Count: ', cardcount);
+  socket.emit('True Count: ', (cardcount/(gameStatePublic.deckSize/52)));
   socket.emit('gameState', gameStatePublic);
+
   socket.onAny((event, ...args) => {
     console.log(event, args);
   });
+
   socket.on('hit', () => {
     console.log('Player '+userId+' hit.');
         
     // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
     if (gameStatePublic.players[userId].turn == true) {
       gameStatePublic.players[userId].hand.push(gameStatePrivate.deck.shift());
+      countcards(gameStatePublic.players[userId].hand[gameStatePublic.players[userId].hand.length-1])
       gameStatePublic.players[userId].score = calculateScore(gameStatePublic.players[userId].hand);
       gameStatePublic.deckRemain = gameStatePrivate.deck.length;
 
       if (gameStatePublic.players[userId].score > 21) {
         console.log('Player '+userId+' busted');
         gameStatePublic.players[userId].turn = false;
+        gameStatePublic.players[userId].winner = false;
       }
+
       console.log('Deck Card Count: '+gameStatePrivate.deck.length);
+      socket.emit('Running Count: ', cardcount);
+      socket.emit('True Count: ', (cardcount/(gameStatePublic.deckSize/52)));
       socket.emit('gameState', gameStatePublic);
     } else {
       console.log('Not Players turn');
@@ -99,6 +107,9 @@ io.on('connection', (socket) => {
     dealHands()
     gameStatePublic.players[userId].playing = true;
     gameStatePublic.players[userId].turn = true;
+
+    socket.emit('Running Count: ', cardcount);
+    socket.emit('True Count: ', (cardcount/(gameStatePublic.deckSize/52)));
     socket.emit('gameState', gameStatePublic);
   });
   socket.on('stand', () => {
@@ -107,16 +118,41 @@ io.on('connection', (socket) => {
     
     //' more work needed
     gameStatePublic.dealerCards = gameStatePrivate.dealerCards
+    countcards(gameStatePublic.dealerCards[0])
+
+    socket.emit('Running Count: ', cardcount);
+    socket.emit('True Count: ', (cardcount/(gameStatePublic.deckSize/52)));
     socket.emit('gameState', gameStatePublic);
     playDealer();
+    checkWinner(gameStatePublic.players[userId]);
+    console.log('result: '+gameStatePublic.players[userId].winner);
+    
+
+    socket.emit('Running Count: ', cardcount);
+    socket.emit('True Count: ', (cardcount/(gameStatePublic.deckSize/52)));
     socket.emit('gameState', gameStatePublic);
   });
 
+  socket.on('disconnect', () => {
+    console.log('Player disconnected:', userId);
+  
+    // Store the player's state and start a timer
+    //disconnectedPlayers[userId] = {
+    //  state: gameStatePublic.players[userId],
+    //  timer: setTimeout(() => {
+    //    console.log('Player gone for over 30 seconds:', userId);
+    //    gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
+    //    removePlayer(userId);
+    //    delete disconnectedPlayers[userId];
+    //  }, 30000), // 30 seconds
+    //};
+  });
 });
 function playDealer() {
     let dealerScore = calculateScore(gameStatePublic.dealerCards);
     while (dealerScore < 17) {
       gameStatePublic.dealerCards.push(gameStatePrivate.deck.shift())
+      countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1])
       dealerScore = calculateScore(gameStatePublic.dealerCards);
     }
     gameStatePrivate.dealerCards = gameStatePublic.dealerCards;
@@ -143,6 +179,7 @@ function dealHands() {
   //deal first card to everyone
   for (let playerID in gameStatePublic.players) {
     gameStatePublic.players[playerID].hand = [gameStatePrivate.deck.shift()];
+    countcards(gameStatePublic.players[playerID].hand[0])
     count++
   }
   gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];
@@ -153,6 +190,7 @@ function dealHands() {
   //deal second card to everyone
   for (let playerID in gameStatePublic.players) {
     gameStatePublic.players[playerID].hand.push(gameStatePrivate.deck.shift());
+    countcards(gameStatePublic.players[playerID].hand[1])
     gameStatePublic.players[playerID].score = calculateScore(gameStatePublic.players[playerID].hand);
     gameStatePublic.players[playerID].winner = null;
   }
@@ -161,7 +199,10 @@ function dealHands() {
   
   //everyone can see dealers second card
   gameStatePublic.dealerCards.push(gameStatePrivate.dealerCards[1]);
+  countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1])
+
   console.log('Dealt '+Object.keys(gameStatePublic.players).length+' player and dealer a new hand');
+  console.log('Deck Card Count: '+gameStatePrivate.deck.length);
   gameStatePublic.deckRemain = gameStatePrivate.deck.length;
   gameStatePublic.dealerScore = null;
 
@@ -202,10 +243,10 @@ function initDeck(numDecks) {
   }
   return deck;
 }
-// Shuffle the deck of cards
+function shuffleDeck(deck) {
+  // Shuffle the deck of cards
   // Move from the last position to the first and select a random card
   // from the remaining cards to put in that position.
-function shuffleDeck(deck) {
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -214,9 +255,10 @@ function shuffleDeck(deck) {
   return deck
 }
 function checkWinner (player) {
+  console.log('card count: '+player.hand.length);
   if (gameStatePublic.dealerScore > 21) {
     player.winner = 'player';
-  } else if (player.score == 21 && player.cards.length == 2 && not (gameStatePublic.dealerScore == 21 && gameStatePublic.dealerHand.length == 2)) {
+  } else if (player.score == 21 && player.hand.length == 2 && not (gameStatePublic.dealerScore == 21 && gameStatePublic.dealerCards.length == 2)) {
     player.winner = 'winner';
   } else if (gameStatePublic.dealerScore == player.score) {
     player.winner = 'push';
@@ -225,15 +267,22 @@ function checkWinner (player) {
   } else {
     player.winner = 'player';
   }
+  console.log('result: '+player.winner);
 }
 // Calculate the score of a hand
-function calculateScore(cards) {
-  let score = cards.reduce((sum, card) => sum + card.value, 0);
-  let numAces = cards.filter((card) => card.rank === 'ace').length;
+function calculateScore(hand) {
+  let score = hand.reduce((sum, card) => sum + card.value, 0);
+  let numAces = hand.filter((card) => card.rank === 'ace').length;
   while (numAces > 0 && score > 21) {
     score -= 10;
     numAces--;
   }
   return score;
 }
-
+function countcards(card){
+  if (card.value > 9) {
+    cardcount--
+  } else if (card.value < 7) {
+    cardcount++
+  }
+}

@@ -22,10 +22,12 @@ socket.on('gameState', data => {
   
   setButtons(player.turn)
   
-  updateScores(calculateScore(player.hand), calculateScore(dealerHand))
   if (player.winner) {
+    console.log('There is a winner, show it!');
     showWinner(player.winner)
   }
+  updateScores(calculateScore(player.hand), calculateScore(dealerHand))
+
 
 });
 socket.onAny((event, ...args) => {
@@ -53,24 +55,19 @@ nameForm.addEventListener('submit', (e) => {
     localStorage.setItem('playerName', playerName);
   }
 });
-
-// Listen for events from the server
 socket.on('connect', () => {
   console.log('Connected to server');
 
 });
-
 socket.on('disconnect', () => {
   console.log('Disconnected from server');
 });
-
-// update page functions
 function setButtons(enabled) {
   console.log('setting buttons: '+enabled);
   if (enabled) {
-    console.log('hit/stand on');
+    console.log('set buttons hit/stand on, others off');
   } else {
-    console.log('deal/new on');
+    console.log('set buttons deal/new on, others off');
   }
   document.getElementById('stand').disabled = !enabled;
   document.getElementById('hit').disabled = !enabled;
@@ -80,9 +77,9 @@ function setButtons(enabled) {
 function showWinner(winner) {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = `Winner: "${winner}"`;
-  if ( winner === "dealer" ) {
+  if ( winner == "dealer" ) {
     loose++
-  } else if ( winner === "player" ) {
+  } else if ( winner == "player" ) {
     win++
   }
   play++
@@ -91,8 +88,6 @@ function updateScores(playerScore, dealerScore) {
   const scoreElement = document.getElementById('scores');
   scoreElement.innerHTML = `Player: ${playerScore} | Dealer: ${dealerScore} | Win: ${win} | Loose: ${loose} | Play ${play}`;
 }
-
-// Send messages to the server
 function hit() {
   console.log('Send hit');
   socket.emit('hit');
@@ -113,8 +108,6 @@ function newGame() {
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
-
-// create a function to draw the dealer's cards
 function drawDealerCards(dealerHand) {
   // set the position of the first card
   let x = 0;
@@ -129,7 +122,6 @@ function drawDealerCards(dealerHand) {
     cardImage.src = card.image;
   });
 }
-
 function drawPlayerCards(playerHand) {
   // set the position of the first card
   let x = 0;
@@ -146,7 +138,6 @@ function drawPlayerCards(playerHand) {
     x += 120
   });
 }
-
 function calculateScore(cards) {
   let score = cards.reduce((sum, card) => sum + card.value, 0);
   let numAces = cards.filter((card) => card.rank === 'ace').length;
