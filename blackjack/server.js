@@ -48,9 +48,6 @@ const gameStatePublic = {
 
 io.on('connection', (socket) => {
   // Get the user id from the cookie
-  console.log('socket key: '+Object.keys(socket));
-  console.log('client: '+Object.keys(socket.client));
-  console.log('data: '+Object.keys(socket.data));
   console.log('playername: '+socket.handshake.auth.playerName);
   if (userId == null) {
     userId = socket.handshake.auth.playerName;
@@ -91,7 +88,15 @@ io.on('connection', (socket) => {
       console.log('Not Players turn');
     }
   });
-
+  socket.on('deal', () => {
+    if (gameStatePrivate.deck.length < 10) {
+      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
+    }
+    dealHands()
+    gameStatePublic.players[userId].playing = true;
+    gameStatePublic.players[userId].turn = true;
+    socket.emit('gameState', gameStatePublic);
+  });
   socket.on('stand', () => {
     console.log('standing');
     gameStatePublic.players[userId].turn = false;
@@ -99,15 +104,16 @@ io.on('connection', (socket) => {
     //' more work needed
     gameStatePublic.dealerCards = gameStatePrivate.dealerCards
     socket.emit('gameState', gameStatePublic);
+    playDealer();
+    socket.emit('gameState', gameStatePublic);
   });
 
 });
 function playDealer() {
-    let dealerscore = calculateScore(dealerHand);
+    let dealerscore = calculateScore(gameStatePublic.dealerCards);
     while (dealerscore < 17) {
-      dealerHand.push(gameState.deck.shift())
-      socket.emit('showHands', { dealerHand, playerHand, winner: gameState.winner });
-      dealerscore = calculateScore(dealerHand);
+      gameStatePublic.dealerCards.push(gameStatePrivate.deck.shift())
+      dealerscore = calculateScore(gameStatePublic.dealerCards);
     }
 }
 function addPlayer(socketId) {
@@ -147,7 +153,7 @@ function dealHands() {
   
   //everyone can see dealers second card
   gameStatePublic.dealerCards.push(gameStatePrivate.dealerCards[1]);
-  console.log('Dealt '+count+' player and dealer a new hand');
+  console.log('Dealt '+Object.keys(gameStatePublic.players).length+' player and dealer a new hand');
 
 }
 

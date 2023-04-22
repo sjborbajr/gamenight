@@ -10,7 +10,7 @@ const nameForm = document.getElementById('name-form');
 
 // Draw the game board and cards
 window.onload = function() {
-  socket.emit('startGame');
+  //should I do anything on load?
 };
 socket.on('gameState', data => {
   console.log('got game state');
@@ -20,7 +20,7 @@ socket.on('gameState', data => {
   drawDealerCards(dealerHand);
   drawPlayerCards(player.hand); 
   
-  setButtons(player.playing)
+  setButtons(player.turn)
 
 });
 socket.onAny((event, ...args) => {
@@ -61,6 +61,12 @@ socket.on('disconnect', () => {
 
 // update page functions
 function setButtons(enabled) {
+  console.log('setting buttons: '+enabled);
+  if (enabled) {
+    console.log('hit/stand on');
+  } else {
+    console.log('deal/new on');
+  }
   document.getElementById('stand').disabled = !enabled;
   document.getElementById('hit').disabled = !enabled;
   document.getElementById('deal').disabled = enabled;
@@ -101,7 +107,6 @@ function newGame() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-    socket.emit('startGame');
 }
 
 // create a function to draw the dealer's cards
