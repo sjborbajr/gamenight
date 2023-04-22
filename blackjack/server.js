@@ -125,7 +125,6 @@ io.on('connection', (socket) => {
     socket.emit('gameState', gameStatePublic);
     playDealer();
     checkWinner(gameStatePublic.players[userId]);
-    console.log('result: '+gameStatePublic.players[userId].winner);
     
 
     socket.emit('Running Count: ', cardcount);
@@ -258,7 +257,7 @@ function checkWinner (player) {
   console.log('card count: '+player.hand.length);
   if (gameStatePublic.dealerScore > 21) {
     player.winner = 'player';
-  } else if (player.score == 21 && player.hand.length == 2 && not (gameStatePublic.dealerScore == 21 && gameStatePublic.dealerCards.length == 2)) {
+  } else if (player.score == 21 && player.hand.length == 2 && !(gameStatePublic.dealerScore == 21 && gameStatePublic.dealerCards.length == 2)) {
     player.winner = 'winner';
   } else if (gameStatePublic.dealerScore == player.score) {
     player.winner = 'push';
@@ -267,7 +266,6 @@ function checkWinner (player) {
   } else {
     player.winner = 'player';
   }
-  console.log('result: '+player.winner);
 }
 // Calculate the score of a hand
 function calculateScore(hand) {
