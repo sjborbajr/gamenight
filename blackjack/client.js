@@ -18,9 +18,14 @@ socket.on('gameState', data => {
   const player = data.players[playerName];
 
   drawDealerCards(dealerHand);
-  drawPlayerCards(player.hand); 
+  drawPlayerCards(player.hand);
   
   setButtons(player.turn)
+  
+  updateScores(calculateScore(player.hand), calculateScore(dealerHand))
+  if (player.winner) {
+    showWinner(player.winner)
+  }
 
 });
 socket.onAny((event, ...args) => {
