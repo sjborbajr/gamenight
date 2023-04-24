@@ -45,7 +45,6 @@ const gameStatePublic = {
   deckRemain: 0,
   dealerCards: [],
   dealerScore: null,
-  currentPlayer: null,
 };
 
 io.on('connection', (socket) => {
