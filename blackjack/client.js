@@ -1,14 +1,36 @@
 const socket = io({autoConnect: false}); // Connect to the server using Socket.IO
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const nameForm = document.getElementById('name-form');
+
 let win = 0;
 let loose = 0;
 let play = 0;
-let userId = null;
 let playerName = localStorage.getItem('playerName'); // get playerName from local storage
-const nameForm = document.getElementById('name-form');
 
-// Draw the game board and cards
+// Attach event listeners to the buttons
+document.getElementById('hit').addEventListener('click', hit);
+document.getElementById('stand').addEventListener('click', stand);
+document.getElementById('new_game').addEventListener('click', newGame);
+document.getElementById('deal').addEventListener('click', deal);
+if (playerName) {
+  nameForm.style.display = 'none';
+  socket.auth = { playerName };
+  socket.connect();
+  win = localStorage.getItem('win');
+  play = localStorage.getItem('play');
+  loose = localStorage.getItem('loose');
+}
+nameForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  playerName = document.getElementById('player-name').value;
+  socket.auth = { playerName };
+  socket.connect();
+  if (playerName) {
+    nameForm.style.display = 'none';
+    localStorage.setItem('playerName', playerName);
+  }
+});
 window.onload = function() {
   //should I do anything on load?
 };
@@ -32,28 +54,6 @@ socket.on('gameState', data => {
 });
 socket.onAny((event, ...args) => {
   console.log(event, args);
-});
-// Attach event listeners to the buttons
-document.getElementById('hit').addEventListener('click', hit);
-document.getElementById('stand').addEventListener('click', stand);
-document.getElementById('new_game').addEventListener('click', newGame);
-document.getElementById('deal').addEventListener('click', deal);
-const storedPlayerName = localStorage.getItem('playerName');
-if (storedPlayerName) {
-  playerName = storedPlayerName;
-  nameForm.style.display = 'none';
-  socket.auth = { playerName };
-  socket.connect();
-}
-nameForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  playerName = document.getElementById('player-name').value;
-  socket.auth = { playerName };
-  socket.connect();
-  if (playerName) {
-    nameForm.style.display = 'none';
-    localStorage.setItem('playerName', playerName);
-  }
 });
 socket.on('connect', () => {
   console.log('Connected to server');
@@ -83,6 +83,9 @@ function showWinner(winner) {
     win++
   }
   play++
+  localStorage.setItem('win', win);
+  localStorage.setItem('loose', loose);
+  localStorage.setItem('play', play);
 }
 function updateScores(playerScore, dealerScore) {
   const scoreElement = document.getElementById('scores');
@@ -97,7 +100,9 @@ function deal() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  socket.emit('deal');
+  setTimeout(() => {
+    socket.emit('deal');
+  }, 250);
 }
 function stand() {
   console.log('Send stand');
@@ -114,12 +119,23 @@ function drawDealerCards(dealerHand) {
   let y = 0;
   // loop through the dealer's hand and draw each card in a separate position
   dealerHand.forEach((card, index) => {
-    const cardImage = new Image();
+    let cardImage = new Image();
+    cardImage.src = card.image;
     cardImage.onload = function() {
       const cardX = x + (index * 120);
       ctx.drawImage(cardImage, cardX, y, 100, 150);
     }
-    cardImage.src = card.image;
+    if (1 == 2) {
+      cardImage.src = card.image;
+      cardImage.onload = function() {
+        var imgbase64 = new fabric.Image(cardImage, {
+          width: 100,
+          height: 150
+        })
+        canvas.add(imgbase64);
+        canvas.deactivateAll().renderAll();
+      }
+    }
   });
 }
 function drawPlayerCards(playerHand) {
