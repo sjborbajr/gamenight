@@ -13,10 +13,11 @@
   <canvas id="canvas" width="600" height="400">></canvas>
   <div id="scores">Player Score: 0 | Dealer Score: 0</div>
   <div class="item">
-    <button id="hit">Hit</button>
-    <button id="stand">Stand</button>
-    <button id="deal">Deal</button>
-    <button id="new_game">Shuffle</button>
+    <button id="hit" disabled>Hit</button>
+    <button id="stand" disabled>Stand</button>
+    <button id="deal" disabled>Deal</button>
+    <button id="new_game" disabled>Shuffle</button>
+    <input type="checkbox" id="playing" checked>Playing?</input>
   </div> 
   <div id="winner"></div>
   <script src="/socket.io/socket.io.js"></script>

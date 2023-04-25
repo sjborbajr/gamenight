@@ -2,6 +2,7 @@ const socket = io({autoConnect: false}); // Connect to the server using Socket.I
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const nameForm = document.getElementById('name-form');
+const playing = document.getElementById('playing');
 
 let win = 0;
 let loose = 0;
@@ -32,7 +33,6 @@ nameForm.addEventListener('submit', (e) => {
   }
 });
 window.onload = function() {
-  //should I do anything on load?
 };
 socket.on('gameState', data => {
   console.log('got game state');
@@ -42,7 +42,9 @@ socket.on('gameState', data => {
   drawDealerCards(dealerHand);
   drawPlayerCards(player.hand);
   
-  setButtons(player.turn)
+  //drawOtherPlayerCards(player.hand);
+  
+  setButtons(player.turn,data.gameover)
   
   if (player.winner) {
     console.log('There is a winner, show it!');
@@ -57,22 +59,25 @@ socket.onAny((event, ...args) => {
 });
 socket.on('connect', () => {
   console.log('Connected to server');
-
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+socket.on('playing?', () => {
+  if (playing.checked) {
+    socket.emit('playing')
+  }
+  const winnerElement = document.getElementById('winner');
+  winnerElement.innerHTML = "";
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
 socket.on('disconnect', () => {
   console.log('Disconnected from server');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
-function setButtons(enabled) {
-  console.log('setting buttons: '+enabled);
-  if (enabled) {
-    console.log('set buttons hit/stand on, others off');
-  } else {
-    console.log('set buttons deal/new on, others off');
-  }
-  document.getElementById('stand').disabled = !enabled;
-  document.getElementById('hit').disabled = !enabled;
-  document.getElementById('deal').disabled = enabled;
-  document.getElementById('new_game').disabled = enabled;
+function setButtons(playing,gameover) {
+  document.getElementById('stand').disabled = !playing;
+  document.getElementById('hit').disabled = !playing;
+  document.getElementById('deal').disabled = !gameover;
+  document.getElementById('new_game').disabled = !gameover;
 }
 function showWinner(winner) {
   const winnerElement = document.getElementById('winner');
@@ -100,9 +105,7 @@ function deal() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  setTimeout(() => {
-    socket.emit('deal');
-  }, 250);
+  socket.emit('deal');
 }
 function stand() {
   console.log('Send stand');
