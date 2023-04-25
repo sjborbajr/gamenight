@@ -2,7 +2,6 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
-const cookieParser = require('cookie-parser');
 
 // Set up the server
 const app = express();
@@ -32,9 +31,7 @@ app.get('/client.js', function(req, res) {
 	  res.sendFile(path.join(__dirname,'client.js'));
 });
 
-// Game state
-
-const numDecks = 2;
+// Create initial game state variables
 const gameStatePrivate = {
   deck: [],
   dealerCards: [],
@@ -48,6 +45,7 @@ const gameStatePublic = {
   dealerScore: null,
   gameover: null,
   trueCount: 0,
+  crazy: true,
 };
 
 io.on('connection', (socket) => {
@@ -60,8 +58,8 @@ io.on('connection', (socket) => {
     // Start the game if this is the first player
     if (Object.keys(gameStatePublic.players).length === 1) {
       console.log('Starting a new game...');
-      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
-      gameStatePublic.deckSize = (numDecks * 52);
+      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(2)));
+      gameStatePublic.deckSize = (2 * 52);
       dealHands();
       gameStatePublic.players[userId].playing = true;
       gameStatePublic.players[userId].turn = true;
@@ -72,20 +70,15 @@ io.on('connection', (socket) => {
   }
 
   // Send current game state to the player
-  socket.emit('gameState', gameStatePublic);
-  if (Object.keys(gameStatePublic.players).length > 1) {
-    socket.broadcast.emit('gameState', gameStatePublic);
-  }
+  sendState(socket);
   socket.onAny((event, ...args) => {
     console.log(event, args);
   });
 
   socket.on('hit', () => {
     console.log('Player '+userId+' hit.');
-    console.log('Player Count: '+(Object.keys(gameStatePublic.players).length));
-        
     // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
-    if (gameStatePublic.players[userId].turn == true) {
+    if (gameStatePublic.players[userId].turn == true || gameStatePublic.crazy == true) {
       gameStatePublic.players[userId].hand.push(gameStatePrivate.deck.shift());
       countcards(gameStatePublic.players[userId].hand[gameStatePublic.players[userId].hand.length-1])
       gameStatePublic.players[userId].score = calculateScore(gameStatePublic.players[userId].hand);
@@ -94,9 +87,9 @@ io.on('connection', (socket) => {
       if (gameStatePublic.players[userId].score > 21) {
         console.log('Player '+userId+' busted');
         gameStatePublic.players[userId].turn = false;
-        gameStatePublic.players[userId].winner = false;
+        gameStatePublic.players[userId].played = true;
+
         let nextPlayer = getNextPlayer();
-        console.log('nextPlayer'+nextPlayer);
         if (nextPlayer){
           gameStatePublic.players[nextPlayer].turn = true;
         } else {
@@ -104,13 +97,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      console.log('Deck Card Count: '+gameStatePrivate.deck.length);
-      console.log('True Count: '+ (cardcount/(gameStatePublic.deckSize/52)));
-      socket.emit('True Count: ', (cardcount/(gameStatePublic.deckSize/52)));
-      socket.emit('gameState', gameStatePublic);
-      if (Object.keys(gameStatePublic.players).length > 1) {
-        socket.broadcast.emit('gameState', gameStatePublic);
-      }
+      sendState(socket);
     } else {
       console.log('Not Players turn');
       socket.emit('turn', 'Not your turn');
@@ -121,15 +108,15 @@ io.on('connection', (socket) => {
       gameStatePublic.players[playerID].playing = false;
     };
     socket.broadcast.emit('playing?', 'deal');
-    if (gameStatePrivate.deck.length < 10) {
-      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
-      gameStatePublic.deckSize = (numDecks * 52);
+    if (gameStatePrivate.deck.length < (5*(Object.keys(gameStatePublic.players).length + 1))) {
+      gameStatePublic.deckSize = ((Object.keys(gameStatePublic.players).length + 1) * 52);
+      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
     }
+    gameStatePublic.players[userId].playing = true;
+    gameStatePublic.players[userId].turn = true;
     setTimeout(() => {
-      gameStatePublic.players[userId].playing = true;
-      dealHands()
-      gameStatePublic.players[userId].turn = true;
-      sendState()
+      dealHands();
+      sendState(socket);
     }, 250 );
   });
   socket.on('stand', () => {
@@ -141,15 +128,18 @@ io.on('connection', (socket) => {
       let nextPlayer = getNextPlayer();
       if (nextPlayer){
         gameStatePublic.players[nextPlayer].turn = true;
-        sendState();
+        sendState(socket);
       } else {
-        gameStatePublic.dealerCards = gameStatePrivate.dealerCards
-        countcards(gameStatePublic.dealerCards[0])
-        
-        playDealer();
-        resolveWinner();
-        gameStatePublic.gameover = true;
-        sendState()
+        gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
+        countcards(gameStatePublic.dealerCards[0]);
+        sendState(socket);
+
+        setTimeout(() => {
+          playDealer();
+          resolveWinner();
+          gameStatePublic.gameover = true;
+          sendState(socket);
+        }, 250 );
       }
     } else {
       console.log('Not Players turn');
@@ -157,9 +147,10 @@ io.on('connection', (socket) => {
     }
   });
   socket.on('playing', () => {
-    gameStatePublic.players[userId].playing = true;
+    if (gameStatePublic.gameover == true) {
+      gameStatePublic.players[userId].playing = true;
+    }
   });
-
   socket.on('disconnect', () => {
     console.log('Player disconnected:', userId);
   
@@ -168,14 +159,13 @@ io.on('connection', (socket) => {
     //  state: gameStatePublic.players[userId],
     //  timer: setTimeout(() => {
     //    console.log('Player gone for over 30 seconds:', userId);
-    //    gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(numDecks)));
     //    removePlayer(userId);
     //    delete disconnectedPlayers[userId];
     //  }, 30000), // 30 seconds
     //};
   });
 });
-function sendState() {
+function sendState(socket) {
   gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize/52));
   socket.emit('gameState', gameStatePublic);
   if (Object.keys(gameStatePublic.players).length > 1) {
@@ -248,11 +238,8 @@ function getNextPlayer() {
   let nextPlayer = null;
   for (let playerID in gameStatePublic.players) {
     if (nextPlayer == null){
-      console.log('checking to see if '+playerID+" has played")
       if (gameStatePublic.players[playerID].playing == true && gameStatePublic.players[playerID].played == false) {
-        console.log(playerID+" needs to play");
         nextPlayer = playerID;
-        console.log("return "+nextPlayer+" needs to play");
       }
     }
   }
@@ -306,11 +293,16 @@ function shuffleDeck(deck) {
 }
 function resolveWinner() {
   for (let playerID in gameStatePublic.players) {
-    checkWinner(gameStatePublic[playerID])
+    if (gameStatePublic.players[playerID].playing) {
+      console.log('checking winning for '+playerID);
+      checkWinner(gameStatePublic.players[playerID]);
+    }
   }
 }
 function checkWinner (player) {
-  if (gameStatePublic.dealerScore > 21) {
+  if (player.score > 21) {
+    player.winner = 'dealer';
+  } else if (gameStatePublic.dealerScore > 21) {
     player.winner = 'player';
   } else if (player.score == 21 && player.hand.length == 2 && !(gameStatePublic.dealerScore == 21 && gameStatePublic.dealerCards.length == 2)) {
     player.winner = 'winner';
