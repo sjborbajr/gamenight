@@ -58,10 +58,10 @@ io.on('connection', (socket) => {
     // Start the game if this is the first player
     if (Object.keys(gameStatePublic.players).length === 1) {
       console.log('Starting a new game...');
-      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(2)));
-      gameStatePublic.deckSize = (2 * 52);
-      dealHands();
+      gameStatePublic.deckSize = 2;
+      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
       gameStatePublic.players[userId].playing = true;
+      dealHands();
       gameStatePublic.players[userId].turn = true;
     } else {
       socket.broadcast.emit('new player', userId);
@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
     };
     socket.broadcast.emit('playing?', 'deal');
     if (gameStatePrivate.deck.length < (5*(Object.keys(gameStatePublic.players).length + 1))) {
-      gameStatePublic.deckSize = ((Object.keys(gameStatePublic.players).length + 1) * 52);
+      gameStatePublic.deckSize = Object.keys(gameStatePublic.players).length + 1;
       gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
     }
     gameStatePublic.players[userId].playing = true;
@@ -166,7 +166,7 @@ io.on('connection', (socket) => {
   });
 });
 function sendState(socket) {
-  gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize/52));
+  gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize));
   socket.emit('gameState', gameStatePublic);
   if (Object.keys(gameStatePublic.players).length > 1) {
     socket.broadcast.emit('gameState', gameStatePublic);
@@ -203,9 +203,11 @@ function dealHands() {
   let count = 0;
   //deal first card to everyone
   for (let playerID in gameStatePublic.players) {
-    gameStatePublic.players[playerID].hand = [gameStatePrivate.deck.shift()];
-    countcards(gameStatePublic.players[playerID].hand[0])
-    count++
+    if (gameStatePublic.players[playerID].playing){
+      gameStatePublic.players[playerID].hand = [gameStatePrivate.deck.shift()];
+      countcards(gameStatePublic.players[playerID].hand[0])
+      count++
+    }
   }
   gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];
 
@@ -214,11 +216,13 @@ function dealHands() {
 
   //deal second card to everyone
   for (let playerID in gameStatePublic.players) {
-    gameStatePublic.players[playerID].hand.push(gameStatePrivate.deck.shift());
-    countcards(gameStatePublic.players[playerID].hand[1])
-    gameStatePublic.players[playerID].score = calculateScore(gameStatePublic.players[playerID].hand);
-    gameStatePublic.players[playerID].winner = null;
-    gameStatePublic.players[playerID].played = false;
+    if (gameStatePublic.players[playerID].playing){
+      gameStatePublic.players[playerID].hand.push(gameStatePrivate.deck.shift());
+      countcards(gameStatePublic.players[playerID].hand[1])
+      gameStatePublic.players[playerID].score = calculateScore(gameStatePublic.players[playerID].hand);
+      gameStatePublic.players[playerID].winner = null;
+      gameStatePublic.players[playerID].played = false;
+    }
   }
   gameStatePrivate.dealerCards.push(gameStatePrivate.deck.shift());
   gameStatePrivate.dealerScore = calculateScore(gameStatePrivate.dealerCards);

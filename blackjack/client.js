@@ -77,7 +77,7 @@ function setButtons(playing,gameover) {
   document.getElementById('stand').disabled = !playing;
   document.getElementById('hit').disabled = !playing;
   document.getElementById('deal').disabled = !gameover;
-  document.getElementById('new_game').disabled = !gameover;
+  //document.getElementById('new_game').disabled = !gameover;
 }
 function showWinner(winner) {
   const winnerElement = document.getElementById('winner');
