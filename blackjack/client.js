@@ -105,6 +105,7 @@ function deal() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  playing.checked = true;
   socket.emit('deal');
 }
 function stand() {

@@ -2,6 +2,7 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
+const fs = require('fs');
 
 // Set up the server
 const app = express();
@@ -31,22 +32,25 @@ app.get('/client.js', function(req, res) {
 	  res.sendFile(path.join(__dirname,'client.js'));
 });
 
+
+const gameStatePrivate = JSON.parse(fs.readFileSync('gameStatePrivate.json'));
+const gameStatePublic = JSON.parse(fs.readFileSync('gameStatePublic.json'));
 // Create initial game state variables
-const gameStatePrivate = {
-  deck: [],
-  dealerCards: [],
-  dealerScore: 0,
-};
-const gameStatePublic = {
-  players: {},
-  deckSize: 0,
-  deckRemain: 0,
-  dealerCards: [],
-  dealerScore: null,
-  gameover: null,
-  trueCount: 0,
-  crazy: true,
-};
+//const gameStatePrivate = {
+//  deck: [],
+//  dealerCards: [],
+//  dealerScore: 0,
+//};
+//const gameStatePublic = {
+//  players: {},
+//  deckSize: 0,
+//  deckRemain: 0,
+//  dealerCards: [],
+//  dealerScore: null,
+//  gameover: null,
+//  trueCount: 0,
+//  crazy: false,
+//};
 
 io.on('connection', (socket) => {
   // Get the user id from handshake
@@ -170,7 +174,9 @@ function sendState(socket) {
   socket.emit('gameState', gameStatePublic);
   if (Object.keys(gameStatePublic.players).length > 1) {
     socket.broadcast.emit('gameState', gameStatePublic);
-  }   
+  }
+  fs.writeFileSync('gameStatePrivate.json', JSON.stringify(gameStatePrivate));
+  fs.writeFileSync('gameStatePublic.json', JSON.stringify(gameStatePublic));
 }
 function playDealer() {
     let dealerScore = calculateScore(gameStatePublic.dealerCards);
@@ -197,7 +203,7 @@ function addPlayer(socketId) {
   };
 }
 function removePlayer(socketId) {
-  delete gameStatePlublic.players[socketId];
+  delete gameStatePublic.players[socketId];
 }
 function dealHands() {
   let count = 0;
