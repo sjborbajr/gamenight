@@ -9,9 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 const path = require('path');
-const { isNull } = require('util');
 let joincount = 0;
-const disconnectedPlayers = {};
 let cardcount = 0;
 
 // Start the server
@@ -72,6 +70,7 @@ io.on('connection', (socket) => {
       socket.emit('message', "game in progress, wait for next deal");
     }
   }
+  gameStatePublic.players[userId].connected = true;
 
   // Send current game state to the player
   sendState(socket);
@@ -157,16 +156,10 @@ io.on('connection', (socket) => {
   });
   socket.on('disconnect', () => {
     console.log('Player disconnected:', userId);
-  
-    // Store the player's state and start a timer
-    //disconnectedPlayers[userId] = {
-    //  state: gameStatePublic.players[userId],
-    //  timer: setTimeout(() => {
-    //    console.log('Player gone for over 30 seconds:', userId);
-    //    removePlayer(userId);
-    //    delete disconnectedPlayers[userId];
-    //  }, 30000), // 30 seconds
-    //};
+    gameStatePublic.players[userId].connected = false;
+    setTimeout(() => {
+        checkAndRemovePlayer(userId);
+    }, 900000); // fifteen minutes
   });
 });
 function sendState(socket) {
@@ -190,9 +183,10 @@ function playDealer() {
     gameStatePublic.score = dealerScore;
     gameStatePublic.deckRemain = gameStatePrivate.deck.length;
 }
-function addPlayer(socketId) {
+function addPlayer(userId) {
+  console.log('adding user: '+userId)
   // winner being null = undecided
-  gameStatePublic.players[socketId] = {
+  gameStatePublic.players[userId] = {
     hand: [],
     score: 0,
     join_order: joincount++,
@@ -202,8 +196,12 @@ function addPlayer(socketId) {
     winner: null,
   };
 }
-function removePlayer(socketId) {
-  delete gameStatePublic.players[socketId];
+function checkAndRemovePlayer(userId) {
+  if (!gameStatePublic.players[userId].connected) {
+    console.log('deleting user: '+userId)
+    delete gameStatePublic.players[userId];
+  }
+  //sendState(socket);
 }
 function dealHands() {
   let count = 0;

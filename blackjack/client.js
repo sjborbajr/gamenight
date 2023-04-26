@@ -42,7 +42,12 @@ socket.on('gameState', data => {
   drawDealerCards(dealerHand);
   drawPlayerCards(player.hand);
   
-  //drawOtherPlayerCards(player.hand);
+  for (let playerID in data.players) {
+    if (!(playerID == playerName)){
+      //console.log("another player: "+playerID)
+      drawOtherPlayerCards(data.players[playerID].hand);
+    }
+  }
   
   setButtons(player.turn,data.gameover)
   
@@ -145,7 +150,7 @@ function drawDealerCards(dealerHand) {
 function drawPlayerCards(playerHand) {
   // set the position of the first card
   let x = 0;
-  let y = 200;
+  let y = 160;
 
   // loop through the player's hand and draw each card in a separate position
   playerHand.forEach(card => {
@@ -156,6 +161,22 @@ function drawPlayerCards(playerHand) {
       ctx.drawImage(cardImage, cardX, y, 100, 150);
     }
     x += 120
+  });
+}
+function drawOtherPlayerCards(playerHand) {
+  // set the position of the first card
+  let x = 0;
+  let y = 320;
+
+  // loop through the player's hand and draw each card in a separate position
+  playerHand.forEach(card => {
+    const cardImage = new Image();
+    const cardX = x
+    cardImage.src = card.image;
+    cardImage.onload = function() {
+      ctx.drawImage(cardImage, cardX, y, 50, 75);
+    }
+    x += 60
   });
 }
 function calculateScore(cards) {
