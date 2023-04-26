@@ -159,7 +159,7 @@ io.on('connection', (socket) => {
     gameStatePublic.players[userId].connected = false;
     setTimeout(() => {
         checkAndRemovePlayer(userId);
-    }, 900000); // fifteen minutes
+    }, (1*60*1000));
   });
 });
 function sendState(socket) {
@@ -197,7 +197,7 @@ function addPlayer(userId) {
   };
 }
 function checkAndRemovePlayer(userId) {
-  if (!gameStatePublic.players[userId].connected) {
+  if (!(gameStatePublic.players[userId].connected)) {
     console.log('deleting user: '+userId)
     delete gameStatePublic.players[userId];
   }
@@ -212,7 +212,8 @@ function dealHands() {
       countcards(gameStatePublic.players[playerID].hand[0])
       count++
     } else {
-      gameStatePublic.players[playerID].hand = []
+      gameStatePublic.players[playerID].hand = [];
+      gameStatePublic.players[playerID].winner = null;
     }
   }
   gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];

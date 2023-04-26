@@ -1,6 +1,8 @@
 const socket = io({autoConnect: false}); // Connect to the server using Socket.IO
 const canvas = document.getElementById('canvas');
+const canvas2 = document.getElementById('canvas2');
 const ctx = canvas.getContext('2d');
+const ctx2 = canvas2.getContext('2d');
 const nameForm = document.getElementById('name-form');
 const playing = document.getElementById('playing');
 
@@ -40,20 +42,25 @@ socket.on('gameState', data => {
   const player = data.players[playerName];
 
   drawDealerCards(dealerHand);
-  drawPlayerCards(player.hand);
+  drawPlayerCards(player);
   
+  let order = 0;
   for (let playerID in data.players) {
     if (!(playerID == playerName)){
       //console.log("another player: "+playerID)
-      drawOtherPlayerCards(data.players[playerID].hand);
+      drawOtherPlayerCards(data.players[playerID],order);
+      order++
     }
   }
   
   setButtons(player.turn,data.gameover)
   
   if (player.winner) {
-    console.log('There is a winner, show it!');
+    //console.log('There is a winner, show it!');
     showWinner(player.winner)
+  } else {
+    const winnerElement = document.getElementById('winner');
+    winnerElement.innerHTML = "&nbsp;";  
   }
   updateScores(calculateScore(player.hand), calculateScore(dealerHand))
 
@@ -108,8 +115,9 @@ function hit() {
 function deal() {
   console.log('Send deal');
   const winnerElement = document.getElementById('winner');
-  winnerElement.innerHTML = "";
+  winnerElement.innerHTML = "&nbsp;";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
   playing.checked = true;
   socket.emit('deal');
 }
@@ -121,6 +129,7 @@ function newGame() {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
 }
 function drawDealerCards(dealerHand) {
   // set the position of the first card
@@ -147,36 +156,76 @@ function drawDealerCards(dealerHand) {
     }
   });
 }
-function drawPlayerCards(playerHand) {
+function drawPlayerCards(player) {
   // set the position of the first card
   let x = 0;
   let y = 160;
 
   // loop through the player's hand and draw each card in a separate position
-  playerHand.forEach(card => {
+  player.hand.forEach(card => {
     const cardImage = new Image();
     const cardX = x
     cardImage.src = card.image;
     cardImage.onload = function() {
       ctx.drawImage(cardImage, cardX, y, 100, 150);
     }
-    x += 120
+    if (player.winner == 'player' || player.winner == 'push') {
+      const chipImage = new Image();
+      chipImage.src = './images/red_chip.png';
+      chipImage.onload = function() {
+        ctx.drawImage(chipImage, cardX+20, y+20, 50, 50);
+      }
+    }
+    if (player.winner == 'player') {
+      const chipImage2 = new Image();
+      chipImage2.src = './images/red_chip.png';
+      chipImage2.onload = function() {
+        ctx.drawImage(chipImage2, cardX+30, y+50, 50, 50);
+      }
+    } else if (player.winner == 'dealer') {
+      const chipImage = new Image();
+      chipImage.src = './images/loose.png';
+      chipImage.onload = function() {
+        ctx.drawImage(chipImage, cardX+20, y+45, 60, 60);
+      }
+    }
+    x += 110;
   });
 }
-function drawOtherPlayerCards(playerHand) {
+function drawOtherPlayerCards(player,position) {
   // set the position of the first card
   let x = 0;
-  let y = 320;
+  let y = (160 * position);
 
   // loop through the player's hand and draw each card in a separate position
-  playerHand.forEach(card => {
+  player.hand.forEach(card => {
     const cardImage = new Image();
     const cardX = x
     cardImage.src = card.image;
     cardImage.onload = function() {
-      ctx.drawImage(cardImage, cardX, y, 50, 75);
+      ctx2.drawImage(cardImage, cardX, y, 100, 150);
     }
-    x += 60
+    if (player.winner == 'player' || player.winner == 'push') {
+      const chipImage = new Image();
+      chipImage.src = './images/red_chip.png';
+      chipImage.onload = function() {
+        ctx2.drawImage(chipImage, cardX+20, y+20, 50, 50);
+      }
+    }
+    if (player.winner == 'player') {
+      const chipImage2 = new Image();
+      chipImage2.src = './images/red_chip.png';
+      chipImage2.onload = function() {
+        ctx2.drawImage(chipImage2, cardX+30, y+50, 50, 50);
+      }
+    } else if (player.winner == 'dealer') {
+      const chipImage = new Image();
+      chipImage.src = './images/loose.png';
+      chipImage.onload = function() {
+        ctx2.drawImage(chipImage, cardX+20, y+45, 60, 60);
+      }
+    }
+    x += 110;
   });
 }
 function calculateScore(cards) {
