@@ -211,6 +211,8 @@ function dealHands() {
       gameStatePublic.players[playerID].hand = [gameStatePrivate.deck.shift()];
       countcards(gameStatePublic.players[playerID].hand[0])
       count++
+    } else {
+      gameStatePublic.players[playerID].hand = []
     }
   }
   gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];
