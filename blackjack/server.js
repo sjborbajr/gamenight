@@ -11,6 +11,7 @@ const io = socketIO(server);
 const path = require('path');
 let joincount = 0;
 let cardcount = 0;
+let turnTimeout = null;
 
 // Start the server
 const port = 3000;
@@ -24,9 +25,9 @@ app.get('/', function (req, res) {
   res.sendFile(path.join(__dirname,'index.html'));
 });
 
-app.set('js', 'text/javascript');
+//app.set('js', 'text/javascript');
 app.get('/client.js', function(req, res) {
-	  res.set('Content-Type', app.get('js'));
+	  res.set('Content-Type', 'text/javascript');
 	  res.sendFile(path.join(__dirname,'client.js'));
 });
 
@@ -50,126 +51,150 @@ const gameStatePublic = JSON.parse(fs.readFileSync('gameStatePublic.json'));
 //  crazy: false,
 //};
 
+setInterval(ServerEvery1Second, (1*1000));
+
+for (let playerID in gameStatePublic.players) {
+  gameStatePublic.players[playerID].connected = false;
+}
+
 io.on('connection', (socket) => {
   // Get the user id from handshake
   const userId = socket.handshake.auth.playerName;
-  console.log('User connected: '+userId);
-  if ( !(gameStatePublic.players[userId])) {
-    addPlayer(userId);
-    
-    // Start the game if this is the first player
-    if (Object.keys(gameStatePublic.players).length === 1) {
-      console.log('Starting a new game...');
-      gameStatePublic.deckSize = 2;
-      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
-      gameStatePublic.players[userId].playing = true;
-      dealHands();
-      gameStatePublic.players[userId].turn = true;
-    } else {
-      socket.broadcast.emit('new player', userId);
-      socket.emit('message', "game in progress, wait for next deal");
+  if (userId == "<dealer>"){
+    socket.emit("error","invalid user")
+    socket.disconnect();
+
+  } else {
+
+    console.log('User connected: '+userId);
+    if ( !(gameStatePublic.players[userId])) {
+      addPlayer(userId);
+      
+      // Start the game if this is the first player
+      if (Object.keys(gameStatePublic.players).length === 1) {
+        console.log('Starting a new game...');
+        gameStatePublic.deckSize = 2;
+        gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
+        gameStatePublic.players[userId].playing = true;
+        dealHands();
+        gameStatePublic.players[userId].turn = true;
+      } else {
+        socket.broadcast.emit('new player', userId);
+        socket.emit('message', "game in progress, wait for next deal");
+      }
     }
-  }
-  gameStatePublic.players[userId].connected = true;
-
-  // Send current game state to the player
-  sendState(socket);
-  socket.onAny((event, ...args) => {
-    console.log(event, args);
-  });
-
-  socket.on('hit', () => {
-    console.log('Player '+userId+' hit.');
-    // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
-    if (gameStatePublic.players[userId].turn == true || gameStatePublic.crazy == true) {
-      gameStatePublic.players[userId].hand.push(gameStatePrivate.deck.shift());
-      countcards(gameStatePublic.players[userId].hand[gameStatePublic.players[userId].hand.length-1])
-      gameStatePublic.players[userId].score = calculateScore(gameStatePublic.players[userId].hand);
-      gameStatePublic.deckRemain = gameStatePrivate.deck.length;
-
-      if (gameStatePublic.players[userId].score > 21) {
-        console.log('Player '+userId+' busted');
+    gameStatePublic.players[userId].connected = true;
+    
+    // Send current game state to the player
+    sendState(socket);
+    socket.onAny((event, ...args) => {
+      console.log(event, args);
+    });
+    
+    socket.on('hit', () => {
+      console.log('Player '+userId+' hit.');
+      if (turnTimeout) {
+        clearTimeout(turnTimeout);
+      }
+      // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
+      if (gameStatePublic.players[userId].turn == true || gameStatePublic.crazy == true) {
+        gameStatePublic.players[userId].hand.push(gameStatePrivate.deck.shift());
+        countcards(gameStatePublic.players[userId].hand[gameStatePublic.players[userId].hand.length-1])
+        gameStatePublic.players[userId].score = calculateScore(gameStatePublic.players[userId].hand);
+        gameStatePublic.deckRemain = gameStatePrivate.deck.length;
+        
+        if (gameStatePublic.players[userId].score > 21) {
+          console.log('Player '+userId+' busted');
+          gameStatePublic.players[userId].turn = false;
+          gameStatePublic.players[userId].played = true;
+          
+          let nextPlayer = getNextPlayer();
+          if (nextPlayer){
+            gameStatePublic.players[nextPlayer].turn = true;
+          } else {
+            gameStatePublic.gameover = true;
+          }
+        }
+        
+        sendState(socket);
+      } else {
+        console.log('Not Players turn');
+        socket.emit('turn', 'Not your turn');
+      }
+    });
+    socket.on('deal', () => {
+      for (let playerID in gameStatePublic.players) {
+        gameStatePublic.players[playerID].playing = false;
+      };
+      socket.broadcast.emit('playing?', 'deal');
+      if (gameStatePrivate.deck.length < (5*(Object.keys(gameStatePublic.players).length + 1))) {
+        gameStatePublic.deckSize = Object.keys(gameStatePublic.players).length + 1;
+        gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
+      }
+      gameStatePublic.players[userId].playing = true;
+      gameStatePublic.players[userId].turn = true;
+      setTimeout(() => {
+        dealHands();
+        sendState(socket);
+      }, 250 );
+    });
+    socket.on('stand', () => {
+      if (gameStatePublic.players[userId].turn == true) {
+        if (turnTimeout ) {
+          clearTimeout(turnTimeout);
+        }
+        console.log(userId+' is standing');
         gameStatePublic.players[userId].turn = false;
         gameStatePublic.players[userId].played = true;
-
+        
         let nextPlayer = getNextPlayer();
         if (nextPlayer){
           gameStatePublic.players[nextPlayer].turn = true;
-        } else {
-          gameStatePublic.gameover = true;
-        }
-      }
-
-      sendState(socket);
-    } else {
-      console.log('Not Players turn');
-      socket.emit('turn', 'Not your turn');
-    }
-  });
-  socket.on('deal', () => {
-    for (let playerID in gameStatePublic.players) {
-      gameStatePublic.players[playerID].playing = false;
-    };
-    socket.broadcast.emit('playing?', 'deal');
-    if (gameStatePrivate.deck.length < (5*(Object.keys(gameStatePublic.players).length + 1))) {
-      gameStatePublic.deckSize = Object.keys(gameStatePublic.players).length + 1;
-      gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
-    }
-    gameStatePublic.players[userId].playing = true;
-    gameStatePublic.players[userId].turn = true;
-    setTimeout(() => {
-      dealHands();
-      sendState(socket);
-    }, 250 );
-  });
-  socket.on('stand', () => {
-    if (gameStatePublic.players[userId].turn == true) {
-      console.log(userId+' is standing');
-      gameStatePublic.players[userId].turn = false;
-      gameStatePublic.players[userId].played = true;
-
-      let nextPlayer = getNextPlayer();
-      if (nextPlayer){
-        gameStatePublic.players[nextPlayer].turn = true;
-        sendState(socket);
-      } else {
-        gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
-        countcards(gameStatePublic.dealerCards[0]);
-        sendState(socket);
-
-        setTimeout(() => {
-          playDealer();
-          resolveWinner();
-          gameStatePublic.gameover = true;
           sendState(socket);
-        }, 250 );
+        } else {
+          gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
+          countcards(gameStatePublic.dealerCards[0]);
+          sendState(socket);
+          
+          setTimeout(() => {
+            playDealer();
+            sendState(socket);
+          }, 250 );
+        }
+      } else {
+        console.log('Not Players turn');
+        socket.emit('turn', 'Not your turn');
       }
-    } else {
-      console.log('Not Players turn');
-      socket.emit('turn', 'Not your turn');
-    }
-  });
-  socket.on('playing', () => {
-    if (gameStatePublic.gameover == true) {
-      gameStatePublic.players[userId].playing = true;
-    }
-  });
-  socket.on('disconnect', () => {
-    console.log('Player disconnected:', userId);
-    gameStatePublic.players[userId].connected = false;
-    setTimeout(() => {
+    });
+    socket.on('playing', () => {
+      if (gameStatePublic.gameover == true) {
+        gameStatePublic.players[userId].playing = true;
+      }
+    });
+    socket.on('disconnect', () => {
+      console.log('Player disconnected:', userId);
+      gameStatePublic.players[userId].connected = false;
+      setTimeout(() => {
         checkAndRemovePlayer(userId);
-    }, (1*60*1000));
-  });
+      }, (15*60*1000));
+    });
+  }
 });
+function endGame(){
+  //handle end game
+
+}
 function sendState(socket) {
   gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize));
-  socket.emit('gameState', gameStatePublic);
-  if (Object.keys(gameStatePublic.players).length > 1) {
-    socket.broadcast.emit('gameState', gameStatePublic);
+  io.emit('gameState', gameStatePublic);
+  if (!gameStatePublic.gameover){
+    if (!turnTimeout && gameStatePublic.players[socket.handshake.auth.playerName].turn){
+      turnTimeout = setTimeout(() => { handleInactivity(socket.handshake.auth.playerName); }, ( 30 * 1000 ));
+    }
   }
-  fs.writeFileSync('gameStatePrivate.json', JSON.stringify(gameStatePrivate));
-  fs.writeFileSync('gameStatePublic.json', JSON.stringify(gameStatePublic));
+  //socket.broadcast.emit('gameState', gameStatePublic);
+  fs.writeFileSync('gameStatePrivate.json', JSON.stringify(gameStatePrivate, null, 2));
+  fs.writeFileSync('gameStatePublic.json', JSON.stringify(gameStatePublic, null, 2));
 }
 function playDealer() {
     let dealerScore = calculateScore(gameStatePublic.dealerCards);
@@ -182,6 +207,25 @@ function playDealer() {
     gameStatePublic.dealerScore = dealerScore;
     gameStatePublic.score = dealerScore;
     gameStatePublic.deckRemain = gameStatePrivate.deck.length;
+    resolveWinner();
+    gameStatePublic.gameover = true;
+}
+function handleInactivity(userId) {
+  console.log("Hey! "+userId+" you are SLOW!!")
+  clearTimeout(turnTimeout);
+  turnTimeout = null;
+  gameStatePublic.players[userId].hand = [];
+  gameStatePublic.players[userId].playing = false;
+  gameStatePublic.players[userId].turn = false;
+  gameStatePublic.players[userId].played = true;
+  if (gameStatePublic.players[userId].connected){
+    io.emit("slap",userId)
+  }
+  let nextPlayer = getNextPlayer();
+  if (nextPlayer == "<dealer>"){
+    playDealer()
+    sendState(io);
+  }
 }
 function addPlayer(userId) {
   console.log('adding user: '+userId)
@@ -197,9 +241,13 @@ function addPlayer(userId) {
   };
 }
 function checkAndRemovePlayer(userId) {
-  if (!(gameStatePublic.players[userId].connected)) {
-    console.log('deleting user: '+userId)
-    delete gameStatePublic.players[userId];
+  if (gameStatePublic.players[userId]) {
+    if (!(gameStatePublic.players[userId].connected)) {
+      //I don't think I should do this
+      //maybe move to redis?
+      //console.log('deleting user: '+userId)
+      //delete gameStatePublic.players[userId];
+    }
   }
   //sendState(socket);
 }
@@ -236,7 +284,7 @@ function dealHands() {
   
   //everyone can see dealers second card
   gameStatePublic.dealerCards.push(gameStatePrivate.dealerCards[1]);
-  countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1])
+  countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1]);
 
   console.log('Dealt '+Object.keys(gameStatePublic.players).length+' player and dealer a new hand');
   console.log('Deck Card Count: '+gameStatePrivate.deck.length);
@@ -247,14 +295,33 @@ function dealHands() {
 }
 function getNextPlayer() {
   let nextPlayer = null;
+  let allBust = true;
   for (let playerID in gameStatePublic.players) {
     if (nextPlayer == null){
       if (gameStatePublic.players[playerID].playing == true && gameStatePublic.players[playerID].played == false) {
         nextPlayer = playerID;
       }
     }
+    console.log(playerID)
+    if (gameStatePublic.players[playerID].score < 22) {
+      allBust = false;
+    }
+  }
+  if (nextPlayer == null){
+    nextPlayer == "<dealer>"
   }
   return nextPlayer
+}
+function getCurrentPlayer() {
+  let currentPlayer = null;
+  for (let playerID in gameStatePublic.players) {
+    if (currentPlayer == null){
+      if (gameStatePublic.players[playerID].playing == true && gameStatePublic.players[playerID].played == false) {
+        currentPlayer = playerID;
+      }
+    }
+  }
+  return currentPlayer
 }
 // Initialize the deck of cards
 function initDeck(numDecks) {
@@ -340,5 +407,15 @@ function countcards(card){
     cardcount--
   } else if (card.value < 7) {
     cardcount++
+  }
+}
+function ServerEvery1Second() {
+  if (!gameStatePublic.gameover) {
+    let CurrentPlayer = getCurrentPlayer()
+    if (CurrentPlayer) {
+      if(!gameStatePublic.players[CurrentPlayer].connected && !turnTimeout){
+        turnTimeout = setTimeout(() => { handleInactivity(CurrentPlayer); }, ( 30 * 1000 ));
+      }
+    }
   }
 }

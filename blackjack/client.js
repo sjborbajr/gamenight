@@ -10,26 +10,25 @@ let win = 0;
 let loose = 0;
 let play = 0;
 let playerName = localStorage.getItem('playerName'); // get playerName from local storage
-
+if (playerName) {
+  nameForm.style.display = 'none';
+  socket.auth = { playerName };
+  socket.connect();
+  win = localStorage.getItem('win') || 0;
+  play = localStorage.getItem('play') || 0;
+  loose = localStorage.getItem('loose') || 0;
+};
 // Attach event listeners to the buttons
 document.getElementById('hit').addEventListener('click', hit);
 document.getElementById('stand').addEventListener('click', stand);
 document.getElementById('new_game').addEventListener('click', newGame);
 document.getElementById('deal').addEventListener('click', deal);
-if (playerName) {
-  nameForm.style.display = 'none';
-  socket.auth = { playerName };
-  socket.connect();
-  win = localStorage.getItem('win');
-  play = localStorage.getItem('play');
-  loose = localStorage.getItem('loose');
-}
 nameForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  playerName = document.getElementById('player-name').value;
-  socket.auth = { playerName };
-  socket.connect();
-  if (playerName) {
+  if (!document.getElementById('player-name').value == '<dealer>') {
+    playerName = document.getElementById('player-name').value;
+    socket.auth = { playerName };
+    socket.connect();
     nameForm.style.display = 'none';
     localStorage.setItem('playerName', playerName);
   }
@@ -42,14 +41,21 @@ socket.on('gameState', data => {
   const player = data.players[playerName];
 
   drawDealerCards(dealerHand);
+  ctx.clearRect( (dealerHand.length * 110),0, (canvas.width - (dealerHand.length * 110)), 160 );
   drawPlayerCards(player);
-  
+  ctx.clearRect( (player.hand.length * 110),160, (canvas.width - (player.hand.length * 110)), 160 );
+
   let order = 0;
   for (let playerID in data.players) {
     if (!(playerID == playerName)){
       //console.log("another player: "+playerID)
-      drawOtherPlayerCards(data.players[playerID],order);
-      order++
+      if (data.players[playerID].playing){
+        drawOtherPlayerCards(data.players[playerID],order);
+        ctx2.clearRect( (data.players[playerID].hand.length * 110),(order * 160), (canvas2.width - (data.players[playerID].hand.length * 110)), 160 );
+        order++
+      }
+      ctx2
+      
     }
   }
   
@@ -80,6 +86,11 @@ socket.on('playing?', () => {
   const winnerElement = document.getElementById('winner');
   winnerElement.innerHTML = "";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+socket.on('slap', (userId) => {
+  if (playing.checked && userId == playerName) {
+    playing.checked = false;
+  }
 });
 socket.on('disconnect', () => {
   console.log('Disconnected from server');
@@ -127,7 +138,7 @@ function stand() {
 }
 function newGame() {
   const winnerElement = document.getElementById('winner');
-  winnerElement.innerHTML = "";
+  winnerElement.innerHTML = "&nbsp;";
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
 }
@@ -140,22 +151,13 @@ function drawDealerCards(dealerHand) {
     let cardImage = new Image();
     cardImage.src = card.image;
     cardImage.onload = function() {
-      const cardX = x + (index * 120);
+      const cardX = x + (index * 110);
       ctx.drawImage(cardImage, cardX, y, 100, 150);
-    }
-    if (1 == 2) {
-      cardImage.src = card.image;
-      cardImage.onload = function() {
-        var imgbase64 = new fabric.Image(cardImage, {
-          width: 100,
-          height: 150
-        })
-        canvas.add(imgbase64);
-        canvas.deactivateAll().renderAll();
-      }
+    
     }
   });
-}
+
+};
 function drawPlayerCards(player) {
   // set the position of the first card
   let x = 0;
