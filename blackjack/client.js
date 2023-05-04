@@ -25,7 +25,7 @@ document.getElementById('new_game').addEventListener('click', newGame);
 document.getElementById('deal').addEventListener('click', deal);
 nameForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  if (!document.getElementById('player-name').value == '<dealer>') {
+  if (!(document.getElementById('player-name').value == '<dealer>')) {
     playerName = document.getElementById('player-name').value;
     socket.auth = { playerName };
     socket.connect();
