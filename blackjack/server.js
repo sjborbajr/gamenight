@@ -12,12 +12,12 @@ server.listen(port, () => {
 });
 
 
+//serv from the public folder
+app.use(express.static(path.join(__dirname, 'public')));
 //client.js is in root dir with server.js
 app.get('/client.js', (req, res) => { res.set('Content-Type', 'text/javascript'); res.sendFile(path.join(__dirname, 'client.js')); });
 //send public/index.html if no specific file is requested
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-//serv anything else from the public folder
-app.use(express.static(path.join(__dirname, 'public')));
 
 const gameStatePrivate = JSON.parse(fs.readFileSync('gameStatePrivate.json'));
 const gameStatePublic = JSON.parse(fs.readFileSync('gameStatePublic.json'));
@@ -42,6 +42,12 @@ setInterval(ServerEvery1Second, (1*1000));
 
 for (let playerID in gameStatePublic.players) {
   gameStatePublic.players[playerID].connected = false;
+}
+
+if (!gameStatePublic.gameover) {
+  let currentPlayer = getCurrentPlayer();
+  console.log("set timeout for "+currentPlayer);
+  turnTimeout = setTimeout(() => { handleInactivity(currentPlayer); }, ( 30 * 1000 ));
 }
 
 io.on('connection', (socket) => {
@@ -223,6 +229,7 @@ function handleInactivity(userId) {
   gameStatePublic.players[userId].playing = false;
   gameStatePublic.players[userId].turn = false;
   gameStatePublic.players[userId].played = true;
+  gameStatePublic.players[userId].winner = "slapped";
 
   let nextPlayer = getNextPlayer();
   if (nextPlayer == "<dealer>"){
@@ -265,7 +272,6 @@ function dealHands() {
       count++
     } else {
       gameStatePublic.players[playerID].hand = [];
-      gameStatePublic.players[playerID].winner = null;
     }
   }
   gameStatePrivate.dealerCards = [gameStatePrivate.deck.shift()];

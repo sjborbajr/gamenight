@@ -109,11 +109,18 @@ function showWinner(winner) {
     loose++
   } else if ( winner == "player" ) {
     win++
+  } else if ( winner == "slapped" ){
+    const chipImage = new Image();
+    chipImage.src = './images/slap.gif';
+    chipImage.onload = function() {
+      ctx.drawImage(chipImage, 0, 160, 150, 150);
+    }
+  } else {
+    play++
+    localStorage.setItem('win', win);
+    localStorage.setItem('loose', loose);
+    localStorage.setItem('play', play);
   }
-  play++
-  localStorage.setItem('win', win);
-  localStorage.setItem('loose', loose);
-  localStorage.setItem('play', play);
 }
 function updateScores(playerScore, dealerScore) {
   const scoreElement = document.getElementById('scores');
