@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
           if (!(nextPlayer == "<dealer>")){
             gameStatePublic.players[nextPlayer].turn = true;
           } else if (nextPlayer == "<dealer>") {
-            playDealer(socket);
+            playDealer();
           } else {
             gameStatePublic.gameover = true;
           }
@@ -144,11 +144,11 @@ io.on('connection', (socket) => {
         gameStatePublic.players[userId].played = true;
         
         let nextPlayer = getNextPlayer();
-        if (!(nextPlayer == "<dealer>")){
+        if (nextPlayer == "<dealer>"){
+          playDealer();
+        } else {
           gameStatePublic.players[nextPlayer].turn = true;
           sendState(socket);
-        } else {
-          playDealer(socket);
         }
       } else {
         console.log('Not Players turn');
@@ -170,47 +170,57 @@ io.on('connection', (socket) => {
   }
 });
 function sendState(socket) {
-  gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize));
-  io.emit('gameState', gameStatePublic);
+  //cleare timer if there is one
   if (turnTimeout) {
     clearTimeout(turnTimeout);
     turnTimeout = null;
   }
-  let currentPlayer = getCurrentPlayer();
-  if (!gameStatePublic.gameover) {
-    if (gameStatePublic.players[socket.handshake.auth.playerName].turn){
-      console.log("set timeout for "+socket.handshake.auth.playerName);
-      turnTimeout = setTimeout(() => { handleInactivity(socket.handshake.auth.playerName); }, ( 30 * 1000 ));
-    }
-  }
-  //socket.broadcast.emit('gameState', gameStatePublic);
+
+  //update game statistics
+  gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize));
+  
+  //send new game state to everyone
+  io.emit('gameState', gameStatePublic);
+  //save game state to disk
   fs.writeFileSync('gameStatePrivate.json', JSON.stringify(gameStatePrivate, null, 2));
   fs.writeFileSync('gameStatePublic.json', JSON.stringify(gameStatePublic, null, 2));
-}
-function playDealer(socket) {
-    //show the dealers hand
-    gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
-    countcards(gameStatePublic.dealerCards[0]);
-    sendState(socket);
 
-    //play the dealers hand out
-    let dealerScore = calculateScore(gameStatePublic.dealerCards);
-    while (dealerScore < 17) {
-      gameStatePublic.dealerCards.push(gameStatePrivate.deck.shift())
-      countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1])
-      dealerScore = calculateScore(gameStatePublic.dealerCards);
-    }
-    gameStatePrivate.dealerCards = gameStatePublic.dealerCards;
-    gameStatePublic.dealerScore = dealerScore;
-    gameStatePublic.score = dealerScore;
-    gameStatePublic.deckRemain = gameStatePrivate.deck.length;
-    resolveWinner();
-    gameStatePublic.gameover = true;
-    
-    //give a time so they can see the dealer card before playing the hand
-    setTimeout(() => {
-      sendState(socket);
-    }, 250 );
+
+  if (!gameStatePublic.gameover) {
+    //send state can be called from stand, need to get next player ID
+    let currentPlayer = getCurrentPlayer();
+    console.log("set timeout for "+currentPlayer);
+    turnTimeout = setTimeout(() => { handleInactivity(currentPlayer); }, ( 30 * 1000 ));
+  }
+}
+function playDealer() {
+  if (turnTimeout) {
+    clearTimeout(turnTimeout);
+    turnTimeout = null;
+  }
+  //show the dealers hand
+  gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
+  countcards(gameStatePublic.dealerCards[0]);
+  io.emit('gameState', gameStatePublic);
+
+  //play the dealers hand out
+  let dealerScore = calculateScore(gameStatePublic.dealerCards);
+  while (dealerScore < 17 ) {
+    gameStatePublic.dealerCards.push(gameStatePrivate.deck.shift());
+    countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1]);
+    dealerScore = calculateScore(gameStatePublic.dealerCards);
+  }
+  gameStatePrivate.dealerCards = gameStatePublic.dealerCards;
+  gameStatePublic.dealerScore = dealerScore;
+  gameStatePublic.deckRemain = gameStatePrivate.deck.length;
+  gameStatePublic.score = dealerScore;
+  resolveWinner();
+  gameStatePublic.gameover = true;
+  
+  //give a time so they can see the dealer card before playing the hand
+  setTimeout(() => {
+    io.emit('gameState', gameStatePublic);
+  }, 250 );
 }
 function handleInactivity(userId) {
   console.log("Hey! "+userId+" you are SLOW!!")
@@ -229,7 +239,7 @@ function handleInactivity(userId) {
 
   let nextPlayer = getNextPlayer();
   if (nextPlayer == "<dealer>"){
-    playDealer(io)
+    playDealer()
   } else if (nextPlayer) {
     gameStatePublic.players[nextPlayer].turn = true;
   }
