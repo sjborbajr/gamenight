@@ -1,17 +1,9 @@
 // Import required modules
-const express = require('express');
-const http = require('http');
-const socketIO = require('socket.io');
-const fs = require('fs');
+const express = require('express'), http = require('http'), socketIO = require('socket.io'), fs = require('fs');
 
 // Set up the server
-const app = express();
-const server = http.createServer(app);
-const io = socketIO(server);
-const path = require('path');
-let joincount = 0;
-let cardcount = 0;
-let turnTimeout = null;
+const app = express(), server = http.createServer(app), io = socketIO(server), path = require('path');
+let joincount = 0, cardcount = 0, turnTimeout = null;
 
 // Start the server
 const port = 3000;
@@ -19,18 +11,13 @@ server.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-// Send index file when there is a connection
-app.use(express.static(path.join(__dirname,'public')));
-app.get('/', function (req, res) {
-  res.sendFile(path.join(__dirname,'index.html'));
-});
 
-//app.set('js', 'text/javascript');
-app.get('/client.js', function(req, res) {
-	  res.set('Content-Type', 'text/javascript');
-	  res.sendFile(path.join(__dirname,'client.js'));
-});
-
+//client.js is in root dir with server.js
+app.get('/client.js', (req, res) => { res.set('Content-Type', 'text/javascript'); res.sendFile(path.join(__dirname, 'client.js')); });
+//send public/index.html if no specific file is requested
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+//serv anything else from the public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 const gameStatePrivate = JSON.parse(fs.readFileSync('gameStatePrivate.json'));
 const gameStatePublic = JSON.parse(fs.readFileSync('gameStatePublic.json'));
@@ -303,7 +290,7 @@ function dealHands() {
   gameStatePublic.dealerCards.push(gameStatePrivate.dealerCards[1]);
   countcards(gameStatePublic.dealerCards[gameStatePublic.dealerCards.length-1]);
 
-  console.log('Dealt '+Object.keys(gameStatePublic.players).length+' player and dealer a new hand');
+  console.log('Dealt count player(s) and dealer a new hand');
   console.log('Deck Card Count: '+gameStatePrivate.deck.length);
   gameStatePublic.deckRemain = gameStatePrivate.deck.length;
   gameStatePublic.dealerScore = null;
@@ -427,7 +414,9 @@ function countcards(card){
 }
 function ServerEvery1Second() {
   if (!gameStatePublic.gameover) {
-    let CurrentPlayer = getCurrentPlayer();
+    //let CurrentPlayer = getCurrentPlayer();
     //console.log("current player: "+CurrentPlayer);
+    //let PlayerCount = Object.values(gameStatePublic.players).filter((player) => player.playing).length;
+    //console.log("player count: "+PlayerCount);
   }
 }
