@@ -84,18 +84,14 @@ io.on('connection', (socket) => {
       }
     }
     gameStatePublic.players[userId].connected = true;
-    
+    io.emit('gameState', gameStatePublic);
     // Send current game state to the player
-    sendState(socket);
     socket.onAny((event, ...args) => {
       console.log(event, args);
     });
     
     socket.on('hit', () => {
       console.log('Player '+userId+' hit.');
-      if (turnTimeout) {
-        clearTimeout(turnTimeout);
-      }
       // Should we verify if it is the players turn? crazy idea, can any one hit at any time?
       if (gameStatePublic.players[userId].turn == true || gameStatePublic.crazy == true) {
         gameStatePublic.players[userId].hand.push(gameStatePrivate.deck.shift());
@@ -109,8 +105,11 @@ io.on('connection', (socket) => {
           gameStatePublic.players[userId].played = true;
           
           let nextPlayer = getNextPlayer();
-          if (nextPlayer){
+          console.log('Next Player '+nextPlayer);
+          if (!(nextPlayer == "<dealer>")){
             gameStatePublic.players[nextPlayer].turn = true;
+          } else if (nextPlayer == "<dealer>") {
+            playDealer(socket);
           } else {
             gameStatePublic.gameover = true;
           }
@@ -140,26 +139,16 @@ io.on('connection', (socket) => {
     });
     socket.on('stand', () => {
       if (gameStatePublic.players[userId].turn == true) {
-        if (turnTimeout ) {
-          clearTimeout(turnTimeout);
-        }
         console.log(userId+' is standing');
         gameStatePublic.players[userId].turn = false;
         gameStatePublic.players[userId].played = true;
         
         let nextPlayer = getNextPlayer();
-        if (nextPlayer){
+        if (!(nextPlayer == "<dealer>")){
           gameStatePublic.players[nextPlayer].turn = true;
           sendState(socket);
         } else {
-          gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
-          countcards(gameStatePublic.dealerCards[0]);
-          sendState(socket);
-          
-          setTimeout(() => {
-            playDealer();
-            sendState(socket);
-          }, 250 );
+          playDealer(socket);
         }
       } else {
         console.log('Not Players turn');
@@ -180,15 +169,17 @@ io.on('connection', (socket) => {
     });
   }
 });
-function endGame(){
-  //handle end game
-
-}
 function sendState(socket) {
   gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize));
   io.emit('gameState', gameStatePublic);
-  if (!gameStatePublic.gameover){
-    if (!turnTimeout && gameStatePublic.players[socket.handshake.auth.playerName].turn){
+  if (turnTimeout) {
+    clearTimeout(turnTimeout);
+    turnTimeout = null;
+  }
+  let currentPlayer = getCurrentPlayer();
+  if (!gameStatePublic.gameover) {
+    if (gameStatePublic.players[socket.handshake.auth.playerName].turn){
+      console.log("set timeout for "+socket.handshake.auth.playerName);
       turnTimeout = setTimeout(() => { handleInactivity(socket.handshake.auth.playerName); }, ( 30 * 1000 ));
     }
   }
@@ -196,7 +187,13 @@ function sendState(socket) {
   fs.writeFileSync('gameStatePrivate.json', JSON.stringify(gameStatePrivate, null, 2));
   fs.writeFileSync('gameStatePublic.json', JSON.stringify(gameStatePublic, null, 2));
 }
-function playDealer() {
+function playDealer(socket) {
+    //show the dealers hand
+    gameStatePublic.dealerCards = gameStatePrivate.dealerCards;
+    countcards(gameStatePublic.dealerCards[0]);
+    sendState(socket);
+
+    //play the dealers hand out
     let dealerScore = calculateScore(gameStatePublic.dealerCards);
     while (dealerScore < 17) {
       gameStatePublic.dealerCards.push(gameStatePrivate.deck.shift())
@@ -209,22 +206,32 @@ function playDealer() {
     gameStatePublic.deckRemain = gameStatePrivate.deck.length;
     resolveWinner();
     gameStatePublic.gameover = true;
+    
+    //give a time so they can see the dealer card before playing the hand
+    setTimeout(() => {
+      sendState(socket);
+    }, 250 );
 }
 function handleInactivity(userId) {
   console.log("Hey! "+userId+" you are SLOW!!")
   clearTimeout(turnTimeout);
   turnTimeout = null;
+
+  if (gameStatePublic.players[userId].connected){
+    io.emit("slap",userId)
+  }
+
+  //take away users hand and remove them from play
   gameStatePublic.players[userId].hand = [];
   gameStatePublic.players[userId].playing = false;
   gameStatePublic.players[userId].turn = false;
   gameStatePublic.players[userId].played = true;
-  if (gameStatePublic.players[userId].connected){
-    io.emit("slap",userId)
-  }
+
   let nextPlayer = getNextPlayer();
   if (nextPlayer == "<dealer>"){
-    playDealer()
-    sendState(io);
+    playDealer(io)
+  } else if (nextPlayer) {
+    gameStatePublic.players[nextPlayer].turn = true;
   }
 }
 function addPlayer(userId) {
@@ -302,13 +309,12 @@ function getNextPlayer() {
         nextPlayer = playerID;
       }
     }
-    console.log(playerID)
     if (gameStatePublic.players[playerID].score < 22) {
       allBust = false;
     }
   }
-  if (nextPlayer == null){
-    nextPlayer == "<dealer>"
+  if (nextPlayer == null && !allBust){
+    nextPlayer = "<dealer>"
   }
   return nextPlayer
 }
@@ -411,11 +417,7 @@ function countcards(card){
 }
 function ServerEvery1Second() {
   if (!gameStatePublic.gameover) {
-    let CurrentPlayer = getCurrentPlayer()
-    if (CurrentPlayer) {
-      if(!gameStatePublic.players[CurrentPlayer].connected && !turnTimeout){
-        turnTimeout = setTimeout(() => { handleInactivity(CurrentPlayer); }, ( 30 * 1000 ));
-      }
-    }
+    let CurrentPlayer = getCurrentPlayer();
+    //console.log("current player: "+CurrentPlayer);
   }
 }
