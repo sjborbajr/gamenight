@@ -46,8 +46,12 @@ for (let playerID in gameStatePublic.players) {
 
 if (!gameStatePublic.gameover) {
   let currentPlayer = getCurrentPlayer();
-  console.log("set timeout for "+currentPlayer);
-  turnTimeout = setTimeout(() => { handleInactivity(currentPlayer); }, ( 30 * 1000 ));
+  if (currentPlayer == null) {
+    gameStatePublic.gameover = true;
+  } else {
+    console.log("set timeout for "+currentPlayer);
+    turnTimeout = setTimeout(() => { handleInactivity(currentPlayer); }, ( 30 * 1000 ));
+  }
 }
 
 io.on('connection', (socket) => {
@@ -56,9 +60,7 @@ io.on('connection', (socket) => {
   if (userId == "<dealer>"){
     socket.emit("error","invalid user")
     socket.disconnect();
-
   } else {
-
     console.log('User connected: '+userId);
     if ( !(gameStatePublic.players[userId])) {
       addPlayer(userId);
@@ -77,7 +79,7 @@ io.on('connection', (socket) => {
       }
     }
     gameStatePublic.players[userId].connected = true;
-    io.emit('gameState', gameStatePublic);
+    sendState()
     // Send current game state to the player
     socket.onAny((event, ...args) => {
       console.log(event, args);
@@ -94,21 +96,22 @@ io.on('connection', (socket) => {
         
         if (gameStatePublic.players[userId].score > 21) {
           console.log('Player '+userId+' busted');
+          gameStatePublic.players[userId].winner = "dealer";
           gameStatePublic.players[userId].turn = false;
           gameStatePublic.players[userId].played = true;
           
           let nextPlayer = getNextPlayer();
           console.log('Next Player '+nextPlayer);
-          if (!(nextPlayer == "<dealer>")){
-            gameStatePublic.players[nextPlayer].turn = true;
-          } else if (nextPlayer == "<dealer>") {
+          if (nextPlayer == null){
+            gameStatePublic.gameover = true;
+          } else if (nextPlayer == "<dealer>"){
             playDealer();
           } else {
-            gameStatePublic.gameover = true;
+            gameStatePublic.players[nextPlayer].turn = true;
           }
         }
         
-        sendState(socket);
+        sendState();
       } else {
         console.log('Not Players turn');
         socket.emit('turn', 'Not your turn');
@@ -124,10 +127,9 @@ io.on('connection', (socket) => {
         gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
       }
       gameStatePublic.players[userId].playing = true;
-      gameStatePublic.players[userId].turn = true;
       setTimeout(() => {
         dealHands();
-        sendState(socket);
+        sendState();
       }, 250 );
     });
     socket.on('stand', () => {
@@ -141,7 +143,7 @@ io.on('connection', (socket) => {
           playDealer();
         } else {
           gameStatePublic.players[nextPlayer].turn = true;
-          sendState(socket);
+          sendState();
         }
       } else {
         console.log('Not Players turn');
@@ -156,13 +158,10 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
       console.log('Player disconnected:', userId);
       gameStatePublic.players[userId].connected = false;
-      setTimeout(() => {
-        checkAndRemovePlayer(userId);
-      }, (15*60*1000));
     });
   }
 });
-function sendState(socket) {
+function sendState() {
   //cleare timer if there is one
   if (turnTimeout) {
     clearTimeout(turnTimeout);
@@ -216,27 +215,35 @@ function playDealer() {
   }, 250 );
 }
 function handleInactivity(userId) {
-  console.log("Hey! "+userId+" you are SLOW!!")
   clearTimeout(turnTimeout);
   turnTimeout = null;
-
-  if (gameStatePublic.players[userId].connected){
-    io.emit("slap",userId)
+  if (Object.values(gameStatePublic.players).filter((player) => player.connected).length > 1) {
+    console.log("Slap "+userId)
+    
+    if (gameStatePublic.players[userId].connected){
+      io.emit("slap",userId)
+    }
+    
+    //take away users hand and remove them from play
+    gameStatePublic.players[userId].hand = [];
+    gameStatePublic.players[userId].playing = false;
+    gameStatePublic.players[userId].turn = false;
+    gameStatePublic.players[userId].played = true;
+    gameStatePublic.players[userId].winner = "slapped";
+    
+    let nextPlayer = getNextPlayer();
+    console.log("Slapped "+userId+" next player: "+nextPlayer)
+    if (nextPlayer == "<dealer>"){
+      playDealer()
+    } else if (nextPlayer == null) {
+      gameStatePublic.gameover = true;
+    } else {
+      console.log("next player is "+nextPlayer)
+      gameStatePublic.players[nextPlayer].turn = true;
+    }
+    sendState()
   }
 
-  //take away users hand and remove them from play
-  gameStatePublic.players[userId].hand = [];
-  gameStatePublic.players[userId].playing = false;
-  gameStatePublic.players[userId].turn = false;
-  gameStatePublic.players[userId].played = true;
-  gameStatePublic.players[userId].winner = "slapped";
-
-  let nextPlayer = getNextPlayer();
-  if (nextPlayer == "<dealer>"){
-    playDealer()
-  } else if (nextPlayer) {
-    gameStatePublic.players[nextPlayer].turn = true;
-  }
 }
 function addPlayer(userId) {
   console.log('adding user: '+userId)
@@ -250,17 +257,6 @@ function addPlayer(userId) {
     turn: false,
     winner: null,
   };
-}
-function checkAndRemovePlayer(userId) {
-  if (gameStatePublic.players[userId]) {
-    if (!(gameStatePublic.players[userId].connected)) {
-      //I don't think I should do this
-      //maybe move to redis?
-      //console.log('deleting user: '+userId)
-      //delete gameStatePublic.players[userId];
-    }
-  }
-  //sendState(socket);
 }
 function dealHands() {
   let count = 0;
@@ -301,6 +297,7 @@ function dealHands() {
   gameStatePublic.deckRemain = gameStatePrivate.deck.length;
   gameStatePublic.dealerScore = null;
   gameStatePublic.gameover = false;
+  gameStatePublic.players[getNextPlayer()].turn = true;
 
 }
 function getNextPlayer() {
@@ -312,7 +309,7 @@ function getNextPlayer() {
         nextPlayer = playerID;
       }
     }
-    if (gameStatePublic.players[playerID].score < 22) {
+    if (gameStatePublic.players[playerID].score < 22 && gameStatePublic.players[playerID].playing == true) {
       allBust = false;
     }
   }

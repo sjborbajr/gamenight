@@ -1,14 +1,9 @@
-const socket = io({autoConnect: false}); // Connect to the server using Socket.IO
-const canvas = document.getElementById('canvas');
-const canvas2 = document.getElementById('canvas2');
-const ctx = canvas.getContext('2d');
-const ctx2 = canvas2.getContext('2d');
-const nameForm = document.getElementById('name-form');
-const playing = document.getElementById('playing');
+const socket = io({autoConnect: false}), canvas = document.getElementById('canvas'), canvas2 = document.getElementById('canvas2');
 
-let win = 0;
-let loose = 0;
-let play = 0;
+const ctx = canvas.getContext('2d'), ctx2 = canvas2.getContext('2d'), nameForm = document.getElementById('name-form'), playing = document.getElementById('playing');
+
+let win = 0, loose = 0, play = 0;
+
 let playerName = localStorage.getItem('playerName'); // get playerName from local storage
 if (playerName) {
   nameForm.style.display = 'none';
@@ -37,8 +32,7 @@ window.onload = function() {
 };
 socket.on('gameState', data => {
   console.log('got game state');
-  const dealerHand = data.dealerCards;
-  const player = data.players[playerName];
+  const dealerHand = data.dealerCards, player = data.players[playerName];
 
   drawDealerCards(dealerHand);
   ctx.clearRect( (dealerHand.length * 110),0, (canvas.width - (dealerHand.length * 110)), 160 );
@@ -47,15 +41,13 @@ socket.on('gameState', data => {
 
   let order = 0;
   for (let playerID in data.players) {
-    if (!(playerID == playerName)){
+    if (!(playerID == playerName)) {
       //console.log("another player: "+playerID)
       if (data.players[playerID].playing){
         drawOtherPlayerCards(data.players[playerID],order);
         ctx2.clearRect( (data.players[playerID].hand.length * 110),(order * 160), (canvas2.width - (data.players[playerID].hand.length * 110)), 160 );
         order++
       }
-      ctx2
-      
     }
   }
   
@@ -68,7 +60,7 @@ socket.on('gameState', data => {
     const winnerElement = document.getElementById('winner');
     winnerElement.innerHTML = "&nbsp;";  
   }
-  updateScores(calculateScore(player.hand), calculateScore(dealerHand))
+  updateScores(player.score, data.dealerScore)
 
 
 });
@@ -208,8 +200,7 @@ function drawOtherPlayerCards(player,position) {
 
   // loop through the player's hand and draw each card in a separate position
   player.hand.forEach(card => {
-    const cardImage = new Image();
-    const cardX = x
+    const cardImage = new Image(), cardX = x;
     cardImage.src = card.image;
     cardImage.onload = function() {
       ctx2.drawImage(cardImage, cardX, y, 100, 150);
@@ -236,13 +227,4 @@ function drawOtherPlayerCards(player,position) {
     }
     x += 110;
   });
-}
-function calculateScore(cards) {
-  let score = cards.reduce((sum, card) => sum + card.value, 0);
-  let numAces = cards.filter((card) => card.rank === 'ace').length;
-  while (numAces > 0 && score > 21) {
-    score -= 10;
-    numAces--;
-  }
-  return score;
 }
