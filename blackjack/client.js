@@ -50,8 +50,11 @@ socket.on('gameState', data => {
       }
     }
   }
-  
-  setButtons(player.turn,data.gameover)
+  let turn = player.turn;
+  if (data.crazy && !data.gameover && !player.played) {
+    turn = true;
+  }
+  setButtons(turn,data.gameover)
   
   if (player.winner) {
     //console.log('There is a winner, show it!');
