@@ -2,8 +2,8 @@
 const express = require('express'), http = require('http'), socketIO = require('socket.io'), fs = require('fs');
 
 // Set up the server
-const app = express(), server = http.createServer(app), io = socketIO(server), path = require('path');
-let joincount = 0, turnTimeout = null;
+const app = express(), server = http.createServer(app), io = socketIO(server), path = require('path'), RateLimit = require('express-rate-limit');;
+let joincount = 0, turnTimeout = null, limiter = RateLimit({windowMs: 1*60*1000,max: 5});
 
 // Start the server
 const port = 3000;
@@ -11,7 +11,8 @@ server.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-
+// apply rate limiter to all requests
+app.use(limiter);
 //serv from the public folder
 app.use(express.static(path.join(__dirname, 'public')));
 //client.js is in root dir with server.js
