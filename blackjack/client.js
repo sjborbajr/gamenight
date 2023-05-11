@@ -130,10 +130,10 @@ function showWinner(winner) {
     }
   } else {
     play++
-    localStorage.setItem('win', win);
-    localStorage.setItem('loose', loose);
-    localStorage.setItem('play', play);
   }
+  localStorage.setItem('win', win);
+  localStorage.setItem('loose', loose);
+  localStorage.setItem('play', play);
 }
 function updateScores(playerScore, dealerScore) {
   const scoreElement = document.getElementById('scores');

@@ -3,7 +3,7 @@ const express = require('express'), http = require('http'), socketIO = require('
 
 // Set up the server
 const app = express(), server = http.createServer(app), io = socketIO(server), path = require('path'), RateLimit = require('express-rate-limit');;
-let joincount = 0, turnTimeout = null, limiter = RateLimit({windowMs: 1*60*1000,max: 5});
+let joincount = 0, turnTimeout = null, limiter = RateLimit({windowMs: 1*1000,max: 5});
 
 // Start the server
 const port = 3000;
@@ -159,9 +159,11 @@ io.on('connection', (socket) => {
       gameStatePublic.players[userId].connected = false;
     });
     socket.on('Show Deck', () => {
-      console.log('Show Deck requested by: '+userId);
-      io.emit('Show Deck',gameStatePrivate.deck)
-      newDeck();
+      if (gameStatePublic.gameover){
+        console.log('Show Deck requested by: '+userId);
+        io.emit('Show Deck',gameStatePrivate.deck)
+        newDeck();
+      }
     });
   }
 });
@@ -306,8 +308,7 @@ function dealHands() {
 }
 function newDeck() {
   gameStatePublic.deckSize = Object.keys(gameStatePublic.players).length + 1;
-  //gameStatePublic.deckSize = 1;
-  gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
+  gameStatePrivate.deck = shuffleDeck(shuffleDeck(createDeck(gameStatePublic.deckSize)));
   gameStatePublic.cardcount = 0;
   fs.writeFileSync('deck.json', JSON.stringify(gameStatePrivate.deck, null, 2));
 
@@ -341,8 +342,7 @@ function getCurrentPlayer() {
   }
   return currentPlayer
 }
-// Initialize the deck of cards
-function initDeck(numDecks) {
+function createDeck(numDecks) {
   numDecks = numDecks || 1; // Set a default value for numDecks
   const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
   const ranks = [
@@ -393,6 +393,14 @@ function shuffleDeck(deck) {
   console.log('Shuffled Deck with '+deck.length+' cards.');
   return deck
 }
+function countcards(card){
+  if (card.value > 9) {
+    gameStatePublic.cardcount--;
+  } else if (card.value < 7) {
+    gameStatePublic.cardcount++;
+  }
+  gameStatePublic.trueCount = (gameStatePublic.cardcount/(gameStatePublic.deckSize));
+}
 function resolveWinner() {
   for (let playerID in gameStatePublic.players) {
     if (gameStatePublic.players[playerID].playing) {
@@ -416,7 +424,6 @@ function checkWinner (player) {
     player.winner = 'player';
   }
 }
-// Calculate the score of a hand
 function calculateScore(hand) {
   let score = hand.reduce((sum, card) => sum + card.value, 0);
   let numAces = hand.filter((card) => card.rank === 'ace').length;
@@ -425,14 +432,6 @@ function calculateScore(hand) {
     numAces--;
   }
   return score;
-}
-function countcards(card){
-  if (card.value > 9) {
-    gameStatePublic.cardcount--;
-  } else if (card.value < 7) {
-    gameStatePublic.cardcount++;
-  }
-  gameStatePublic.trueCount = (gameStatePublic.cardcount/(gameStatePublic.deckSize));
 }
 function ServerEvery1Second() {
   if (!gameStatePublic.gameover) {
