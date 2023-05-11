@@ -16,7 +16,7 @@ if (playerName) {
 // Attach event listeners to the buttons
 document.getElementById('hit').addEventListener('click', hit);
 document.getElementById('stand').addEventListener('click', stand);
-document.getElementById('new_game').addEventListener('click', newGame);
+document.getElementById('show_deck').addEventListener('click', showDeck);
 document.getElementById('deal').addEventListener('click', deal);
 nameForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -74,6 +74,24 @@ socket.on('connect', () => {
   console.log('Connected to server');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
+socket.on('Show Deck', data => {
+  let x = 0;
+  let y = 0;
+  // loop through the dealer's hand and draw each card in a separate position
+  data.forEach((card, index) => {
+    let cardImage = new Image();
+    cardImage.src = card.image;
+    cardImage.onload = function() {
+      const cardX = x
+      ctx.drawImage(cardImage, cardX, y, 100, 150);
+      x = x + 20;
+      if (x > (canvas.width - 10)) {
+        x=0;
+        y=y+40;
+      }
+    }
+  });
+});
 socket.on('playing?', () => {
   if (playing.checked) {
     socket.emit('playing')
@@ -95,7 +113,7 @@ function setButtons(playing,gameover) {
   document.getElementById('stand').disabled = !playing;
   document.getElementById('hit').disabled = !playing;
   document.getElementById('deal').disabled = !gameover;
-  //document.getElementById('new_game').disabled = !gameover;
+  document.getElementById('show_deck').disabled = !gameover;
 }
 function showWinner(winner) {
   const winnerElement = document.getElementById('winner');
@@ -138,11 +156,9 @@ function stand() {
   console.log('Send stand');
   socket.emit('stand');
 }
-function newGame() {
-  const winnerElement = document.getElementById('winner');
-  winnerElement.innerHTML = "&nbsp;";
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+function showDeck() {
+  console.log('Show Deck');
+  socket.emit('Show Deck');
 }
 function drawDealerCards(dealerHand) {
   // set the position of the first card

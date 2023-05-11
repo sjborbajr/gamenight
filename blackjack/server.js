@@ -3,7 +3,7 @@ const express = require('express'), http = require('http'), socketIO = require('
 
 // Set up the server
 const app = express(), server = http.createServer(app), io = socketIO(server), path = require('path');
-let joincount = 0, cardcount = 0, turnTimeout = null;
+let joincount = 0, turnTimeout = null;
 
 // Start the server
 const port = 3000;
@@ -68,8 +68,7 @@ io.on('connection', (socket) => {
       // Start the game if this is the first player
       if (Object.keys(gameStatePublic.players).length === 1) {
         console.log('Starting a new game...');
-        gameStatePublic.deckSize = 2;
-        gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
+        newDeck()
         gameStatePublic.players[userId].playing = true;
         dealHands();
         gameStatePublic.players[userId].turn = true;
@@ -123,8 +122,7 @@ io.on('connection', (socket) => {
       };
       socket.broadcast.emit('playing?', 'deal');
       if (gameStatePrivate.deck.length < (5*(Object.keys(gameStatePublic.players).length + 1))) {
-        gameStatePublic.deckSize = Object.keys(gameStatePublic.players).length + 1;
-        gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
+        newDeck();
       }
       gameStatePublic.players[userId].playing = true;
       setTimeout(() => {
@@ -159,6 +157,11 @@ io.on('connection', (socket) => {
       console.log('Player disconnected:', userId);
       gameStatePublic.players[userId].connected = false;
     });
+    socket.on('Show Deck', () => {
+      console.log('Show Deck requested by: '+userId);
+      io.emit('Show Deck',gameStatePrivate.deck)
+      newDeck();
+    });
   }
 });
 function sendState() {
@@ -167,9 +170,6 @@ function sendState() {
     clearTimeout(turnTimeout);
     turnTimeout = null;
   }
-
-  //update game statistics
-  gameStatePublic.trueCount = (cardcount/(gameStatePublic.deckSize));
   
   //send new game state to everyone
   io.emit('gameState', gameStatePublic);
@@ -208,11 +208,14 @@ function playDealer() {
   gameStatePublic.score = dealerScore;
   resolveWinner();
   gameStatePublic.gameover = true;
-  
+  fs.writeFileSync('gameStatePrivate.json', JSON.stringify(gameStatePrivate, null, 2));
+  fs.writeFileSync('gameStatePublic.json', JSON.stringify(gameStatePublic, null, 2));
+
   //give a time so they can see the dealer card before playing the hand
   setTimeout(() => {
     io.emit('gameState', gameStatePublic);
   }, 250 );
+
 }
 function handleInactivity(userId) {
   clearTimeout(turnTimeout);
@@ -300,6 +303,14 @@ function dealHands() {
   gameStatePublic.players[getNextPlayer()].turn = true;
 
 }
+function newDeck() {
+  gameStatePublic.deckSize = Object.keys(gameStatePublic.players).length + 1;
+  //gameStatePublic.deckSize = 1;
+  gameStatePrivate.deck = shuffleDeck(shuffleDeck(initDeck(gameStatePublic.deckSize)));
+  gameStatePublic.cardcount = 0;
+  fs.writeFileSync('deck.json', JSON.stringify(gameStatePrivate.deck, null, 2));
+
+}
 function getNextPlayer() {
   let nextPlayer = null;
   let allBust = true;
@@ -368,9 +379,15 @@ function shuffleDeck(deck) {
   // Shuffle the deck of cards
   // Move from the last position to the first and select a random card
   // from the remaining cards to put in that position.
+  //console.log('Start shuffle '+deck.length+' cards.');
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    if (i > j){
+      //console.log('i is '+i+' j is '+j+' Swap '+deck[j].image+' with '+deck[i].image);
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    } else {
+      //console.log('i is '+i+' j is '+j)
+    }
   }
   console.log('Shuffled Deck with '+deck.length+' cards.');
   return deck
@@ -410,10 +427,11 @@ function calculateScore(hand) {
 }
 function countcards(card){
   if (card.value > 9) {
-    cardcount--
+    gameStatePublic.cardcount--;
   } else if (card.value < 7) {
-    cardcount++
+    gameStatePublic.cardcount++;
   }
+  gameStatePublic.trueCount = (gameStatePublic.cardcount/(gameStatePublic.deckSize));
 }
 function ServerEvery1Second() {
   if (!gameStatePublic.gameover) {
