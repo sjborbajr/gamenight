@@ -1,8 +1,8 @@
 // Import required modules
-const express = require('express'), http = require('http'), socketIO = require('socket.io'), fs = require('fs');
+const express = require('express'), http = require('http'), socketIO = require('socket.io'), fs = require('fs'), RateLimit = require('express-rate-limit'), path = require('path');
 
 // Set up the server
-const app = express(), server = http.createServer(app), io = socketIO(server), path = require('path'), RateLimit = require('express-rate-limit');;
+const app = express(), server = http.createServer(app), io = socketIO(server);
 let joincount = 0, turnTimeout = null, limiter = RateLimit({windowMs: 1*1000,max: 5});
 
 // Start the server
@@ -22,23 +22,6 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const gameStatePrivate = JSON.parse(fs.readFileSync('gameStatePrivate.json'));
 const gameStatePublic = JSON.parse(fs.readFileSync('gameStatePublic.json'));
-// Create initial game state variables
-//const gameStatePrivate = {
-//  deck: [],
-//  dealerCards: [],
-//  dealerScore: 0,
-//};
-//const gameStatePublic = {
-//  players: {},
-//  deckSize: 0,
-//  deckRemain: 0,
-//  dealerCards: [],
-//  dealerScore: null,
-//  gameover: null,
-//  trueCount: 0,
-//  crazy: false,
-//};
-
 setInterval(ServerEvery1Second, (1*1000));
 
 for (let playerID in gameStatePublic.players) {
@@ -59,7 +42,7 @@ io.on('connection', (socket) => {
   // Get the user id from handshake
   const userId = socket.handshake.auth.playerName;
   if (userId == "<dealer>"){
-    socket.emit("error","invalid user")
+    socket.emit("error","invalid user");
     socket.disconnect();
   } else {
     console.log('User connected: '+userId);
@@ -69,7 +52,7 @@ io.on('connection', (socket) => {
       // Start the game if this is the first player
       if (Object.keys(gameStatePublic.players).length === 1) {
         console.log('Starting a new game...');
-        newDeck()
+        newDeck();
         gameStatePublic.players[userId].playing = true;
         dealHands();
         gameStatePublic.players[userId].turn = true;
