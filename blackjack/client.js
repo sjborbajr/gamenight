@@ -74,23 +74,31 @@ socket.on('connect', () => {
   console.log('Connected to server');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 });
-socket.on('Show Deck', data => {
+socket.on('Show Deck', async data => {
   let x = 0;
   let y = 0;
-  // loop through the dealer's hand and draw each card in a separate position
-  data.forEach((card, index) => {
-    let cardImage = new Image();
-    cardImage.src = card.image;
-    cardImage.onload = function() {
-      const cardX = x
-      ctx.drawImage(cardImage, cardX, y, 100, 150);
-      x = x + 20;
-      if (x > (canvas.width - 10)) {
-        x=0;
-        y=y+40;
-      }
+
+  for (let card of data) {
+    try {
+      await new Promise((resolve, reject) => {
+        let cardImage = new Image();
+        cardImage.src = card.image;
+        cardImage.onload = function() {
+          const cardX = x
+          ctx.drawImage(cardImage, cardX, y, 100, 150);
+          x = x + 20;
+          if (x > (canvas.width - 10)) {
+            x=0;
+            y=y+40;
+          }
+          resolve();
+        }
+        cardImage.onerror = reject;
+      });
+    } catch (err) {
+      console.error(`Failed to load image: ${card.image}`, err);
     }
-  });
+  }
 });
 socket.on('playing?', () => {
   if (playing.checked) {

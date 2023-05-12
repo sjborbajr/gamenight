@@ -1,9 +1,9 @@
 // Import required modules
-const express = require('express'), http = require('http'), socketIO = require('socket.io'), fs = require('fs'), RateLimit = require('express-rate-limit'), path = require('path');
-
+const express = require('express'), http = require('http'), socketIO = require('socket.io'), fs = require('fs'), path = require('path');
+//RateLimit = require('express-rate-limit'), 
 // Set up the server
 const app = express(), server = http.createServer(app), io = socketIO(server);
-let joincount = 0, turnTimeout = null, limiter = RateLimit({windowMs: 1*1000,max: 5});
+let joincount = 0, turnTimeout = null;//, limiter = RateLimit({windowMs: 500,max: 25});
 
 // Start the server
 const port = 3000;
@@ -12,7 +12,7 @@ server.listen(port, () => {
 });
 
 // apply rate limiter to all requests
-app.use(limiter);
+//app.use(limiter);
 //serv from the public folder
 app.use(express.static(path.join(__dirname, 'public')));
 //client.js is in root dir with server.js
