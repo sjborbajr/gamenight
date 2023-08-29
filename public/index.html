@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Game Night</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="alertMsg" role="alert" id="alertMsg" style="display: 'none';"></div>
+  <button class="tablink"               onclick="showTab(this)" id="HomeBtn"    >Home</button>
+  <button class="tablink" hidden="true" onclick="showTab(this)" id="HandFootBtn">Hand+Foot</button>
+  <button class="tablink" hidden="true" onclick="showTab(this)" id="SystemBtn"  >System</button>
+  <div id="Home" class="tabcontent" style="display: flex;">
+    <div style="width: 100%;">
+      <label for="player-name">
+        <span>Player Name:</span>
+        <input type="text" id="player-name" />
+      </label>
+      <button type="button" id="connectButton"    onclick="connectButton()"            >Connect</button>
+      <button type="button" id="disconnectButton" onclick="disconnectButton()" disabled>Disconnect</button>
+    </div>
+    <div style="width: 50%;">
+      <h3>Connected Users</h3>
+      <div id="connected-users" style="position: relative; border: 1px solid black; height: 100px;">
+        <ul id="home-users-connected">
+        </ul>
+        <button class="refreshButton" onclick="refreshConnected()" ><img src="/refresh.gif" alt="Refresh" style="width:10px;height:10px;"></button>
+      </div>
+    </div>
+    <div style="width: 50%;">
+      <h3>Starting Games</h3>
+      <div id="starting-games" style="position: relative; border: 1px solid black; height: 100px;">
+        <ul id="starting-games">
+        </ul>
+        <button class="refreshButton" onclick="refreshGames()" ><img src="/refresh.gif" alt="Refresh" style="width:10px;height:10px;"></button>
+      </div>
+      <input type="text" id="games_name">
+      <button id="create-game" style="margin-top: 5px;">Create</button>
+      <button id="join-game" style="margin-top: 5px;">Join</button>
+    </div>
+  </div>
+  <div id="HandFoot" class="tabcontent" style="display: flex;">
+  </div>
+  <div id="System" class="tabcontent" style="display: flex;">
+  </div>
+  <script src="/socket.io/socket.io.min.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>
