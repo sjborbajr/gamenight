@@ -24,7 +24,7 @@ socket.on('serverRole', role => {
     document.getElementById('SystemBtn').style.display = 'inline';
     setTimeout(function() {
       document.getElementById('HomeBtn').style.width = '33.3%'
-      document.getElementById('HandFootBtn').style.width = '33.3%'
+      document.getElementById('GameBtn').style.width = '33.3%'
       document.getElementById('SystemBtn').style.width = '33.4%'
     }, 100);
   };
@@ -55,8 +55,8 @@ socket.on('connect', () => {
   setTimeout(()=> document.getElementById('alertMsg').style.display = 'none',1500);
 
   document.getElementById('HomeBtn').style.width = '50%'
-  document.getElementById('HandFootBtn').style.width = '50%'
-  document.getElementById('HandFootBtn').style.display = 'inline';
+  document.getElementById('GameBtn').style.width = '50%'
+  document.getElementById('GameBtn').style.display = 'inline';
 
 });
 socket.on('nameChanged', (name) => {
@@ -80,7 +80,7 @@ socket.on('disconnect', () => {
   document.getElementById('alertMsg').style.display = 'inline';
 
   document.getElementById('HomeBtn').style.width = '100%'
-  document.getElementById('HandFootBtn').style.display = 'none';
+  document.getElementById('GameBtn').style.display = 'none';
   document.getElementById('SystemBtn').style.display = 'none';
 });
 function connectButton() {
@@ -123,7 +123,7 @@ function showTab(elmnt) {
   //set tab color
   let colors = {
     HomeBtn:'green',
-    HandFootBtn:'blue',
+    GameBtn:'blue',
     SystemBtn:'red'
   }
   elmnt.style.backgroundColor = colors[elmnt.id];
@@ -151,3 +151,15 @@ function refreshConnected() {
 function refreshGames() {
   socket.emit("refreshGames","");
 }
+function createGame() {
+  socket.emit("createGame",document.getElementById('game_name').value);
+}
+function joinGame() {
+  let selected = document.querySelector('li.selected');
+  if (selected){
+    if (selected.value == 'startingGame'){
+      socket.emit('joinParty',selected.id)
+    }
+  }
+}
+

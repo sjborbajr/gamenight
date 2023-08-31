@@ -7,9 +7,9 @@
 </head>
 <body>
   <div class="alertMsg" role="alert" id="alertMsg" style="display: 'none';"></div>
-  <button class="tablink"               onclick="showTab(this)" id="HomeBtn"    >Home</button>
-  <button class="tablink" hidden="true" onclick="showTab(this)" id="HandFootBtn">Hand+Foot</button>
-  <button class="tablink" hidden="true" onclick="showTab(this)" id="SystemBtn"  >System</button>
+  <button class="tablink"               onclick="showTab(this)" id="HomeBtn"  >Home</button>
+  <button class="tablink" hidden="true" onclick="showTab(this)" id="GameBtn"  >Game</button>
+  <button class="tablink" hidden="true" onclick="showTab(this)" id="SystemBtn">System</button>
   <div id="Home" class="tabcontent" style="display: flex;">
     <div style="width: 100%;">
       <label for="player-name">
@@ -34,12 +34,23 @@
         </ul>
         <button class="refreshButton" onclick="refreshGames()" ><img src="/refresh.gif" alt="Refresh" style="width:10px;height:10px;"></button>
       </div>
-      <input type="text" id="games_name">
-      <button id="create-game" style="margin-top: 5px;">Create</button>
-      <button id="join-game" style="margin-top: 5px;">Join</button>
+      <select id="game_name" onChange="historyFilterLimit(this.value)">
+        <option value="handFoot">Hand &amp Foot</option>
+        <option value="texasHoldEm">Texas Hold'em</option>
+        <option value="blackJack">Black Jack</option>
+        <option value="goFish">Go Fish</option>
+        <option value="fiveCardDraw">Five Card Draw</option>
+        <option value="rummy">Rummy</option>
+        <option value="gin">Gin</option>
+        <option value="blitz">Blitz!</option>
+        <option value="Mao">Mao</option>
+        <option value="Uno">Uno</option>
+      </select>
+      <button id="create-game" style="margin-top: 5px;" onclick="createGame()">Create</button>
+      <button id="join-game" style="margin-top: 5px;" onclick="joinGame()">Join</button>
     </div>
   </div>
-  <div id="HandFoot" class="tabcontent" style="display: flex;">
+  <div id="Game" class="tabcontent" style="display: flex;">
   </div>
   <div id="System" class="tabcontent" style="display: flex;">
   </div>

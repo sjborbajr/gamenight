@@ -18,9 +18,7 @@ const database = client.db('gamenight');
 const settingsCollection = database.collection('settings'), gameDataCollection = database.collection('gameData');
 
 // Set up the app/web/io server
-const app = express();
-const server = http.createServer(app);
-const io = new SocketIO(server);
+const app = express(), server = http.createServer(app), io = new SocketIO(server);
 const __filename = fileURLToPath(import.meta.url), __dirname = dirname(__filename);
 
 // Start the web server
@@ -65,6 +63,66 @@ io.on('connection', async (socket) => {
   }
 
   gameDataCollection.updateOne({type:'player',name:playerName},{$set:{connected:true}});
+
+  //emit to friends that playerName is online
+
+  //emit all games currently in, join channels
+
+
+
+  socket.on('createGame', async data => {
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' is starting a game of '+data.gameName)
+    //validate the user does not currently have an active game
+
+    //create game, emit game, join channel
+    
+  });
+
+  socket.on('joinGame', async data => {
+    //validate data.gameId is forming or game type allow a person to join 
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to join game '+data.gameId)
+    //validate there is space for this game type or ask members if table is full (add to friends list)
+  });
+
+  socket.on('addComputerPlayer', async data => {
+    //validate data.gameId is forming
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to join game '+data.gameId)
+    //validate there is space for this game type
+  });
+
+  socket.on('bootPlayer', async data => {
+    //validate data.gameId is forming or allows in game boot
+    //validate role is admin or player owns game
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to boot '+data.otherPlayerName+' from game '+data.gameId)
+  });
+
+  socket.on('startGame', async data => {
+    //validate data.gameId is forming
+    //validate role is admin or player owns game
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to start game '+data.gameId)
+    //validate the right number of players for this game type
+    //add players to players freinds lists
+    //deal
+  });
+
+  socket.on('endGame', async data => {
+    //validate data.gameId is running
+    //validate role is admin or player owns game
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to end game '+data.gameId)
+    //end game, teardown channel
+  });
+
+  socket.on('getRules', async data => {
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants rules for '+data.gameName)
+  });
+
+  socket.on('removeFriend', async data => {
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to remove friend '+data.playerId)
+  });
+
+  
+
+  //Generic system below
   if (playerData.admin){
     socket.emit('serverRole','admin')
   }
@@ -98,6 +156,7 @@ io.on('connection', async (socket) => {
   });
   socket.on('disconnect', () => {
     console.log('['+new Date().toUTCString()+'] Player disconnected:', playerName);
+    //emit to friends playerName went offline
     gameDataCollection.updateOne({type:'player',name:playerName},{$set:{connected:false}});
   });
 });
@@ -137,4 +196,55 @@ async function updatePlayer(playerName,update) {
   } catch (error){
     console.error('Error saving response to MongoDB:', error);
   }
+}
+function createDeck(numDecks) {
+  numDecks = numDecks || 1; // Set a default value for numDecks
+  const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
+  const ranks = [
+    { name: 'ace', value: 11 },
+    { name: '2', value: 2 },
+    { name: '3', value: 3 },
+    { name: '4', value: 4 },
+    { name: '5', value: 5 },
+    { name: '6', value: 6 },
+    { name: '7', value: 7 },
+    { name: '8', value: 8 },
+    { name: '9', value: 9 },
+    { name: '10', value: 10 },
+    { name: 'jack', value: 10 },
+    { name: 'queen', value: 10 },
+    { name: 'king', value: 10 },
+  ];
+
+  const deck = [];
+  for (let d = 0; d < numDecks; d++) {
+    for (let i = 0; i < suits.length; i++) {
+      for (let j = 0; j < ranks.length; j++) {
+        deck.push({
+          suit: suits[i],
+          rank: ranks[j].name,
+          value: ranks[j].value,
+          image: "images/"+ ranks[j].name+"_of_"+suits[i]+".png",
+        });
+      }
+    }
+  }
+  return deck;
+}
+function shuffleDeck(deck) {
+  // Shuffle the deck of cards
+  // Move from the last position to the first and select a random card
+  // from the remaining cards to put in that position.
+  //console.log('Start shuffle '+deck.length+' cards.');
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    if (i > j){
+      //console.log('i is '+i+' j is '+j+' Swap '+deck[j].image+' with '+deck[i].image);
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    } else {
+      //console.log('i is '+i+' j is '+j)
+    }
+  }
+  console.log('Shuffled Deck with '+deck.length+' cards.');
+  return deck
 }
