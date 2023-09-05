@@ -68,8 +68,6 @@ io.on('connection', async (socket) => {
 
   //emit all games currently in, join channels
 
-
-
   socket.on('createGame', async data => {
     console.log('['+new Date().toUTCString()+'] User '+playerName+' is starting a game of '+data.gameName)
     //validate the user does not currently have an active game
@@ -94,6 +92,7 @@ io.on('connection', async (socket) => {
     //validate data.gameId is forming or allows in game boot
     //validate role is admin or player owns game
     console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to boot '+data.otherPlayerName+' from game '+data.gameId)
+    //available to ban them? (go invisible)
   });
 
   socket.on('startGame', async data => {
@@ -120,7 +119,11 @@ io.on('connection', async (socket) => {
     console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to remove friend '+data.playerId)
   });
 
+  socket.on('removeBan', async data => {
+    console.log('['+new Date().toUTCString()+'] User '+playerName+' wants to remove Ban '+data.playerId)
+  });
   
+  //record/leader board keeping
 
   //Generic system below
   if (playerData.admin){
