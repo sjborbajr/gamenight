@@ -152,13 +152,13 @@ function refreshGames() {
   socket.emit("refreshGames","");
 }
 function createGame() {
-  socket.emit("createGame",document.getElementById('game_name').value);
+  socket.emit("createGame",{gameName:document.getElementById('game_name').value});
 }
 function joinGame() {
   let selected = document.querySelector('li.selected');
   if (selected){
     if (selected.value == 'startingGame'){
-      socket.emit('joinParty',selected.id)
+      socket.emit('joinParty',{gameId:selected.id})
     }
   }
 }
